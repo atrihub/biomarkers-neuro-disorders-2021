@@ -16,20 +16,36 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## About me
 
-This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+* 2001 - 2005: PhD Mathematics, University of California, San Diego
+  - *Rank Regression & Synergy Detection*
+* 2005 - 2015: Biostatistician/Faculty, University of California, San Diego
+  - Alzheimer's Disease Neuroimaging Initiative (ADNI)
+  - Alzheimer's Disease Cooperative Study (ADCS)
+* 2015 - Present: Faculty, University of Southern California, San Diego
+  - Associate Director of Biostatistics, [Alzheimer's Therapeutic Research Institute (ATRI)](https://keck.usc.edu/atri/)
+  - Biostatistics Unit Co-Lead, [Alzheimer's Clinical Trial Consortium (ACTC)](https://www.actcinfo.org/)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+## Course Overview
 
-## Slide with Bullets
+Topics:
 
-- Bullet 1
-- Bullet 2
-- Bullet 3
+* 9:00 - 9:50 -- Biostatistics for Fluid Biomarkers
+* 10:00 - 10:50 -- Biostatistics for Imaging Biomarkers
+* 11:00 - 11:50 -- Modeling Longitudinal Data
+
+Emphases:
+
+* Visuliazation 
+* Demonstrations using R, code available from:
+  - [https://github.com/atrihub/biomarkers-neuro-disorders-2020](https://github.com/atrihub/biomarkers-neuro-disorders-2020)
+
 
 ## Slide with R Output
 
 ```{r cars, echo = TRUE}
 summary(cars)
+# library(nCal)
+# library(calibFit)
 ```
 
 ## Slide with Plot

@@ -10,8 +10,10 @@ The biostatistics module is from *9:00 to 12:00 on Monday April 24, 2020*. Topic
 
 ### Biostatistics for Fluid Biomarkers (9:00-9:50)
 
+* Experimental design and randomization
 * Calibration
 * Batch effects
+* Storage effects
 * Regression
 * Classification
 
@@ -21,7 +23,7 @@ The biostatistics module is from *9:00 to 12:00 on Monday April 24, 2020*. Topic
 * Centiloids
 * Machine learning
 
-### Longitudinal Date (11:00-11:50)
+### Modeling Longitudinal Data (11:00-11:50)
 
 * Visualizing longitudinal Data
 * Mixed-effect models
