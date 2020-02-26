@@ -8,14 +8,58 @@ logo: "images/usc.png"
 output:
   ioslides_presentation:
     widescreen: true
+    self_contained: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-library(tidyverse)
+# https://bookdown.org/yihui/rmarkdown/ioslides-presentation.html
 
+library(knitr)
+library(tidyverse)
+library(plotly)
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 library(calibFit)
+
+options(digits=2)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = NA,
+  echo = FALSE, cache = TRUE, 
+  cache.path = 'fluid_cache/',
+  fig.path = 'fluid_fig/',
+  tidy=FALSE,
+  out.extra = '',
+  out.width='80%',
+  fig.align = 'center', crop = TRUE, fig.pos = '!h', 
+  fig.height=3, fig.width=3*(16/9),
+  message = FALSE, 
+  warning = FALSE, results = 'hide'
+)
+
+theme_set(theme_bw())
+
+# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette0 <-
+    c("#0072B2", "#CC79A7", "#E69F00",
+      "#009E73", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#D55E00")
+cbbPalette <-
+    c("#009E73", "#CC79A7", "#0072B2",
+      "#E69F00", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#D55E00")
+cbbPalette <-
+    c("#0072B2", "#CC79A7", "#E69F00",
+      "#009E73", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#D55E00")
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
 ```
 
 ## About me
@@ -44,27 +88,53 @@ Emphases:
   - [https://github.com/atrihub/biomarkers-neuro-disorders-2020](https://github.com/atrihub/biomarkers-neuro-disorders-2020)
 
 
-## Batch effects
+## Batch effects: Boxplot
 
-```{r cars, echo = TRUE}
+```{r generate_batch_data}
 # simulated data with batch effects
 set.seed(20200225)
 # variance for each batch
-Sigma <- 
+Sigma <- rgamma(n=10, shape=360/10, scale=10)
 # Mean for each batch
-Mean <- rnorm(n=10, mean=300, sd = 10)
+Mean <- rnorm(n=10, mean=850, sd = 100)
 
 batch_data <- expand.grid(
   batch = 1:10,
-  id = 1:20
+  id = 1:50
 ) %>%
-  mutate(id = paste(batch, id, sep="_"))
-
+  mutate(id = paste(batch, id, sep="_")) %>%
+  arrange(batch) %>%
+  mutate(batch = as.factor(batch))
+batch_data$Biomarker <- unlist(lapply(1:10, function(i) rnorm(n=50, mean=Mean[i], sd=Sigma[i])))
 ```
 
-## Slide with Plot
-
-```{r pressure}
-plot(pressure)
+```{r batch_data_plot}
+ggplot(batch_data, aes(y=Biomarker, x=batch)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
 ```
 
+## Batch effects: Summaries {.smaller}
+
+```{r batch_data_summaries, results='asis', cache=FALSE, rows.print=3}
+batch_data_sum <- batch_data %>% group_by(batch) %>%
+  summarize(
+    N=length(Biomarker),
+    Mean=mean(Biomarker), 
+    SD=sd(Biomarker),
+    `SD/Mean = CV (%)`=SD/Mean*100)
+batch_data_sum %>%
+  kable(digits=2, padding = 0)
+```
+
+## Batch effects: Confounds
+
+```{r}
+low_groups <- subset(batch_data_sum, Mean<median(batch_data_sum$Mean))$batch
+batch_data <- batch_data %>%
+  mutate(Group = ifelse(batch %in% low_groups, 'A', 'B'))
+ggplot(batch_data, aes(y=Biomarker, x=batch)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(aes(color=Group, fill=Group), 
+    binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
+```
