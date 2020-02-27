@@ -5,6 +5,7 @@ author:
   company: USC Alzheimer's Therapeutic Research Institute
 date: April 20, 2020
 logo: "images/usc.png"
+bibliography: references.bib
 output:
   ioslides_presentation:
     widescreen: true
@@ -13,19 +14,23 @@ output:
 
 ```{r setup, include=FALSE}
 # https://bookdown.org/yihui/rmarkdown/ioslides-presentation.html
+# http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html
 
 library(knitr)
+library(kableExtra)
 library(tidyverse)
 library(plotly)
+library(gridExtra)
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 library(calibFit)
 
 options(digits=2)
+options(kableExtra.html.bsTable = TRUE)
 
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = NA,
-  echo = FALSE, cache = TRUE, 
+  echo = FALSE, cache = FALSE, 
   cache.path = 'fluid_cache/',
   fig.path = 'fluid_fig/',
   tidy=FALSE,
@@ -40,14 +45,6 @@ knitr::opts_chunk$set(
 theme_set(theme_bw())
 
 # http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
-cbbPalette0 <-
-    c("#0072B2", "#CC79A7", "#E69F00",
-      "#009E73", "#F0E442", "#999999",
-      "#000000", "#56B4E9", "#D55E00")
-cbbPalette <-
-    c("#009E73", "#CC79A7", "#0072B2",
-      "#E69F00", "#F0E442", "#999999",
-      "#000000", "#56B4E9", "#D55E00")
 cbbPalette <-
     c("#0072B2", "#CC79A7", "#E69F00",
       "#009E73", "#F0E442", "#999999",
@@ -62,14 +59,14 @@ scale_fill_discrete <-
     function(...) scale_fill_manual(..., values = cbbPalette)
 ```
 
-## About me
+##  About me
 
-* 2001 - 2005: PhD Mathematics, University of California, San Diego
+- 2001 - 2005: PhD Mathematics, University of California, San Diego
   - *Rank Regression & Synergy Detection*
-* 2005 - 2015: Biostatistician/Faculty, University of California, San Diego
+- 2005 - 2015: Biostatistician/Faculty, University of California, San Diego
   - Alzheimer's Disease Neuroimaging Initiative (ADNI)
   - Alzheimer's Disease Cooperative Study (ADCS)
-* 2015 - Present: Faculty, University of Southern California, San Diego
+- 2015 - Present: Faculty, University of Southern California, San Diego
   - Associate Director of Biostatistics, [Alzheimer's Therapeutic Research Institute (ATRI)](https://keck.usc.edu/atri/)
   - Biostatistics Unit Co-Lead, [Alzheimer's Clinical Trial Consortium (ACTC)](https://www.actcinfo.org/)
 
@@ -77,16 +74,23 @@ scale_fill_discrete <-
 
 Topics:
 
-* 9:00 - 9:50 -- Biostatistics for Fluid Biomarkers
-* 10:00 - 10:50 -- Biostatistics for Imaging Biomarkers
-* 11:00 - 11:50 -- Modeling Longitudinal Data
+- 9:00 - 9:50 -- Biostatistics for Fluid Biomarkers
+- 10:00 - 10:50 -- Biostatistics for Imaging Biomarkers
+- 11:00 - 11:50 -- Modeling Longitudinal Data
 
 Emphases:
 
-* Visuliazation 
-* Demonstrations using R, code available from:
+- Visuliazation 
+- Demonstrations using R, code available from:
   - [https://github.com/atrihub/biomarkers-neuro-disorders-2020](https://github.com/atrihub/biomarkers-neuro-disorders-2020)
 
+## Session 1 Outline
+
+- Batch effects
+- Randomization
+- Calibration
+- Regression
+- Classification
 
 ## Batch effects: Boxplot
 
@@ -96,7 +100,7 @@ set.seed(20200225)
 # variance for each batch
 Sigma <- rgamma(n=10, shape=360/10, scale=10)
 # Mean for each batch
-Mean <- rnorm(n=10, mean=850, sd = 100)
+Mean <- rnorm(n=10, mean=850, sd=200)
 
 batch_data <- expand.grid(
   batch = 1:10,
@@ -106,6 +110,8 @@ batch_data <- expand.grid(
   arrange(batch) %>%
   mutate(batch = as.factor(batch))
 batch_data$Biomarker <- unlist(lapply(1:10, function(i) rnorm(n=50, mean=Mean[i], sd=Sigma[i])))
+batch_data <- batch_data %>%
+  mutate(Biomarker = ifelse(Biomarker<0, 0, Biomarker))
 ```
 
 ```{r batch_data_plot}
@@ -114,9 +120,9 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_dotplot(binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
 ```
 
-## Batch effects: Summaries {.smaller}
+## Coefficient of Variation
 
-```{r batch_data_summaries, results='asis', cache=FALSE, rows.print=3}
+```{r batch_data_summaries, results='asis', cache=FALSE}
 batch_data_sum <- batch_data %>% group_by(batch) %>%
   summarize(
     N=length(Biomarker),
@@ -124,8 +130,14 @@ batch_data_sum <- batch_data %>% group_by(batch) %>%
     SD=sd(Biomarker),
     `SD/Mean = CV (%)`=SD/Mean*100)
 batch_data_sum %>%
-  kable(digits=2, padding = 0)
+  kable(digits=2, format = 'html') %>%
+  kable_styling(
+    bootstrap_options=c('striped', 'condensed'),
+    font_size=18, full_width=FALSE)
 ```
+
+- Coefficient of Variation (CV) = SD/Mean
+- Often used for quality control (reject batch with CV > $x$)
 
 ## Batch effects: Confounds
 
@@ -136,5 +148,77 @@ batch_data <- batch_data %>%
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
   geom_dotplot(aes(color=Group, fill=Group), 
-    binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
+    binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 ```
+
+## Randomized plate/batch assignment
+
+```{r}
+batch_data$Group <- sample(batch_data$Group, size=nrow(batch_data))
+ggplot(batch_data, aes(y=Biomarker, x=batch)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(aes(color=Group, fill=Group), 
+    binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
+```
+
+## Experimental Design for Fluid Biomarkers
+
+- Randomize samples to batches/plates
+- Longitudinally collected samples (samples collected over time on same individual):
+  - If batch effects are expected to be larger than storage effects, consider randomizing *individuals* to batches
+  - (Keep all samples from individual on the same plate)
+- Randomization can be stratified to ensure important factors (e.g. treatment group, age, APOE $\epsilon4$) are balanced
+
+## Testing for Batch Effects
+
+```{r, echo=TRUE, results='markup'}
+anova(lm(Biomarker ~ batch, batch_data))
+```
+
+* Batch explains a significant amount of the variation in this simulated data
+* R note: `batch` variable must be a `factor`, not `numeric` (otherwise, you will get a batch slope)
+
+## Calibration
+
+- Calibration: developing a map from "raw" assay responses to concentrations (ng/ml) using samples with known concentrations
+- We will explore some approaches to calibration with methods from the `R` package `calibFit` ( @calibFit @davidian1990 )
+- The package includes some example High Performance Liquid Chromatography (HPLC) and Enzyme Linked Immunosorbent Assay (ELISA) to demostrate the methods
+
+## Calibration
+
+```{r, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+data(HPLC)
+data(ELISA)
+
+linmodel <- lm(Response~Concentration, data=HPLC)
+# The predicted response
+HPLC$Fitted <- fitted(linmodel)
+
+p1 <- ggplot(HPLC, aes(x=Concentration, y=Response)) +
+  geom_point() +
+  geom_line(aes(y=Fitted)) +
+	xlab("Concentration (ng/ml)") +
+	ylab("Response") +
+	ggtitle("HPLC with ordinary least squares fit")
+
+fplmodel <- with(ELISA,
+  calib.fit(Concentration, Response, type="log.fpl")
+)
+# The predicted response
+ELISA$Fitted <- fplmodel@fitted.values
+
+p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response)) +
+  geom_point() +
+  geom_line(aes(y=Fitted)) +
+	xlab("log(Concentration (ng/ml))") +
+	ylab("Response") +
+	ggtitle("ELISA with 4 parameter logistic fit")
+
+grid.arrange(p1,p2,nrow=1)
+```
+
+## Calibration
+
+@calibFit @davidian1990
+
+## References
