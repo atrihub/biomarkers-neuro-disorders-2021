@@ -497,7 +497,7 @@ grid.arrange(p1,p2,nrow=1)
 
 ---
 
-# Modeling Heterscedastic Errors
+# Modeling Heteroscedastic Errors
 
 The `calibFit` package includes models of the form: 
 
