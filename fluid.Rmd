@@ -1,31 +1,34 @@
 ---
-title: "Biostatistics for fluid biomarkers"
-author: 
-  name: Michael C Donohue PhD
-  company: USC Alzheimer's Therapeutic Research Institute
-date: April 20, 2020
-logo: "images/usc.png"
-bibliography: references.bib
-output:
-  ioslides_presentation:
-    widescreen: true
-    self_contained: true
+title: Biostatistics for Fluid Biomarkers
+output: 
+  xaringan::moon_reader:
+    self_contained:  false
+    css: ["default", "default-fonts", "./css/styles.css"]
+    seal: false 
+    lib_dir: libs
+    nature:
+      # autoplay: 5000
+      highlightStyle: solarized-light
+      highlightLanguage: ["r", "css", "yaml"]
+      # slideNumberFormat: "" 
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+      titleSlideClass: [top, right]
 ---
 
-```{r setup, include=FALSE}
-# https://bookdown.org/yihui/rmarkdown/ioslides-presentation.html
-# http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
+# remotes::install_github('atrihub/SRS')
 
 library(knitr)
 library(kableExtra)
 library(tidyverse)
 library(plotly)
 library(gridExtra)
-# devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 library(calibFit)
-
+library(SRS)
 options(digits=2)
-options(kableExtra.html.bsTable = TRUE)
 
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -33,22 +36,26 @@ knitr::opts_chunk$set(
   echo = FALSE, cache = FALSE, 
   cache.path = 'fluid_cache/',
   fig.path = 'fluid_fig/',
+  dev='svg',
   tidy=FALSE,
   out.extra = '',
   out.width='80%',
   fig.align = 'center', crop = TRUE, fig.pos = '!h', 
   fig.height=3, fig.width=3*(16/9),
   message = FALSE, 
-  warning = FALSE, results = 'hide'
+  warning = FALSE
 )
+# knitr::knit_hooks$set(inline = function(x) {
+#   prettyNum(x, big.mark=",")
+# })
 
 theme_set(theme_bw())
 
 # http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
 cbbPalette <-
-    c("#0072B2", "#CC79A7", "#E69F00",
+    c("#0072B2", "#D55E00", "#E69F00",
       "#009E73", "#F0E442", "#999999",
-      "#000000", "#56B4E9", "#D55E00")
+      "#000000", "#56B4E9", "#CC79A7")
 scale_colour_discrete <-
     function(...) scale_colour_manual(..., values = cbbPalette)
 scale_fill_discrete <-
@@ -59,8 +66,55 @@ scale_fill_discrete <-
     function(...) scale_fill_manual(..., values = cbbPalette)
 ```
 
-##  About me
 
+```{r, load_refs, include=FALSE, cache=FALSE}
+library(RefManageR)
+BibOptions(check.entries = FALSE,
+           bib.style = "authoryear",
+           cite.style = "authoryear",
+           style = "markdown",
+           hyperlink = FALSE,
+           dashed = FALSE)
+bib <- ReadBib("./references.bib", check = FALSE)
+# Citet(), Citep(), AutoCite()
+```
+
+class: middle, center
+
+# Biostatistics for Fluid Biomarkers
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+April 20, 2020.
+
+.pull-left[
+
+```{r echo=FALSE, fig.align='center', out.width='57%'}
+knitr::include_graphics("./images/atri.png")
+```
+
+]
+
+
+.pull-right[
+
+```{r echo=FALSE, fig.align='center', out.width='47%'}
+knitr::include_graphics("./images/actc_logo.png")
+```
+
+]
+
+---
+
+#  About me
+
+.large[
 - 2001 - 2005: PhD Mathematics, University of California, San Diego
   - *Rank Regression & Synergy Detection*
 - 2005 - 2015: Biostatistician/Faculty, University of California, San Diego
@@ -69,9 +123,13 @@ scale_fill_discrete <-
 - 2015 - Present: Faculty, University of Southern California, San Diego
   - Associate Director of Biostatistics, [Alzheimer's Therapeutic Research Institute (ATRI)](https://keck.usc.edu/atri/)
   - Biostatistics Unit Co-Lead, [Alzheimer's Clinical Trial Consortium (ACTC)](https://www.actcinfo.org/)
+]
 
-## Course Overview
+---
 
+# Course Overview
+
+.large[
 Topics:
 
 - 9:00 - 9:50 -- Biostatistics for Fluid Biomarkers
@@ -83,16 +141,30 @@ Emphases:
 - Visuliazation 
 - Demonstrations using R, code available from:
   - [https://github.com/atrihub/biomarkers-neuro-disorders-2020](https://github.com/atrihub/biomarkers-neuro-disorders-2020)
+]
 
-## Session 1 Outline
+---
 
+# Session 1 Outline
+
+.large[
 - Batch effects
 - Randomization
 - Calibration
 - Regression
 - Classification
+]
 
-## Batch effects: Boxplot
+---
+
+class: inverse, middle, center
+
+# Batch Effects
+
+---
+
+
+# Batch Effects: Boxplot
 
 ```{r generate_batch_data}
 # simulated data with batch effects
@@ -120,7 +192,11 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_dotplot(binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
 ```
 
-## Coefficient of Variation
+---
+
+# Coefficient of Variation
+
+.pull-left[
 
 ```{r batch_data_summaries, results='asis', cache=FALSE}
 batch_data_sum <- batch_data %>% group_by(batch) %>%
@@ -136,10 +212,29 @@ batch_data_sum %>%
     font_size=18, full_width=FALSE)
 ```
 
+]
+
+.pull-right[
+
 - Coefficient of Variation (CV) = SD/Mean
 - Often used for quality control (reject batch with CV > $x$)
 
-## Batch effects: Confounds
+]
+
+---
+
+# Testing for Batch Effects
+
+```{r, echo=TRUE, results='markup'}
+anova(lm(Biomarker ~ batch, batch_data))
+```
+
+* Batch explains a significant amount of the variation in this simulated data
+* R note: `batch` variable must be a `factor`, not `numeric` (otherwise, you will get a batch slope)
+
+---
+
+# Batch effects: Confounds
 
 ```{r}
 low_groups <- subset(batch_data_sum, Mean<median(batch_data_sum$Mean))$batch
@@ -151,7 +246,15 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 ```
 
-## Randomized plate/batch assignment
+---
+
+class: inverse, middle, center
+
+# Experimental Design for Fluid Biomarkers
+
+---
+
+# Randomized assignment of samples to plates
 
 ```{r}
 batch_data$Group <- sample(batch_data$Group, size=nrow(batch_data))
@@ -161,32 +264,175 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 ```
 
-## Experimental Design for Fluid Biomarkers
+---
 
+# Experimental Design for Fluid Biomarkers
+
+.large[
 - Randomize samples to batches/plates
 - Longitudinally collected samples (samples collected over time on same individual):
   - If batch effects are expected to be larger than storage effects, consider randomizing *individuals* to batches
   - (Keep all samples from individual on the same plate)
 - Randomization can be stratified to ensure important factors (e.g. treatment group, age, APOE $\epsilon4$) are balanced
+]
 
-## Testing for Batch Effects
+---
 
-```{r, echo=TRUE, results='markup'}
-anova(lm(Biomarker ~ batch, batch_data))
+# Sample Randomization
+
+We use an `R` package [SRS](https://github.com/atrihub/SRS) ("Subject Randomization System"), which we have modified to deal with the constraints of plate capacity, and keeping samples from the same subject together.
+
+```{r randomization}
+library(SRS)
+data(srs_data)
+# head(srs_data)
+
+p.func.greedy.if.possible <- function(overallImbalance, treatmentCounts, maxCounts)
+{
+    cant.go <- treatmentCounts > maxCounts
+    if(all(cant.go)) 
+      stop("Randomization impossible. Probably need another treatment group.")
+
+    number.of.treatments <- length(overallImbalance)
+    k <- which(overallImbalance == min(overallImbalance))
+    p.vec <- rep(0, number.of.treatments)
+    p.vec[k] <- 1
+    p.vec/sum(p.vec)
+    p.vec[cant.go] <- 0
+
+    if(all(p.vec == 0)){ # try less greedy
+      number.of.treatments <- length(overallImbalance)
+      p.star <- 2/3
+      k <- which(overallImbalance == min(overallImbalance))
+      if (length(k) > 1) {
+          k <- sample(k, 1)
+      }
+      p.vec <- rep((1 - p.star)/(number.of.treatments - 1), number.of.treatments)
+      p.vec[k] <- p.star
+      p.vec      
+      p.vec[cant.go] <- 0
+    }
+    
+    p.vec
+}
+
+get.counts <- function(object)
+{
+  expt <- object@expt
+  treatment.names <- expt@treatment.names
+  factor.names <- expt@factor.names
+  factor.level.names <- expt@factor.level.names
+  treatment.names <- expt@treatment.names
+  state.matrix <- object@stateTable
+  tr.ratios <- object@tr.ratios
+  
+  tr.assignments <- object@tr.assignments
+  tr.assignments$Treatment <- factor(tr.assignments$Treatment, 
+    levels = treatment.names)
+  tr.assignments$Counts <- factor(tr.assignments$Counts, 
+    levels = factor.level.names[[which(factor.names == "Counts")]])
+  tr.assignments <- with(tr.assignments, table(Counts, Treatment)) * 
+    as.numeric(factor.level.names[[which(factor.names == "Counts")]])
+  colSums(tr.assignments)
+}  
+
+expt <- ClinicalExperiment(number.of.factors = 3,
+  factor.names = c('Counts', 'Group', 'Age'),
+  number.of.factor.levels = c(2, 5, 2),
+  factor.level.names = 
+    list(c(4, 5), 1:5, c('young', 'old')),
+  number.of.treatments = 13,
+  treatment.names = as.character(1:13))
+
+g.func <- function(imbalances)
+{
+    factor.weights <- c (1, 100, 1)
+    imbalances %*% factor.weights
+}
+
+r.obj <- new("cPocockSimonRandomizer", expt, as.integer(20130827), 
+  g.func=g.func, p.func = p.func.greedy.if.possible, max.counts = 30)
+
+for(i in 1:nrow(srs_data)){
+  r.obj <- randomize(r.obj, as.character(srs_data[i, "ID"]), 
+     as.character(srs_data[i, expt@factor.names]))
+}
 ```
 
-* Batch explains a significant amount of the variation in this simulated data
-* R note: `batch` variable must be a `factor`, not `numeric` (otherwise, you will get a batch slope)
+```{r, results='asis'}
+tr.assignments <- r.obj@tr.assignments %>%
+  mutate(
+    Treatment = factor(Treatment, levels = r.obj@expt@treatment.names),
+    `Subject ID` = 1:nrow(r.obj@tr.assignments)
+  ) %>%
+  rename(
+    Plate = Treatment,
+    `Num. of samples` = Counts) %>%
+  select(`Subject ID`, `Num. of samples`, Group, Age, Plate)
 
-## Calibration
+tr.assignments[1:10, ] %>%
+  kable(digits=2, format = 'html') %>%
+  kable_styling(
+    bootstrap_options=c('striped', 'condensed'),
+    font_size=18, full_width=FALSE)
+```
 
-- Calibration: developing a map from "raw" assay responses to concentrations (ng/ml) using samples with known concentrations
-- We will explore some approaches to calibration with methods from the `R` package `calibFit` ( @calibFit @davidian1990 )
-- The package includes some example High Performance Liquid Chromatography (HPLC) and Enzyme Linked Immunosorbent Assay (ELISA) to demostrate the methods
+---
 
-## Calibration
+# Sample Randomization
 
-```{r, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+.pull-left[
+
+```{r}
+tab <- with(tr.assignments, table(Plate, Age)) %>%
+  as.data.frame() %>%
+  pivot_wider(names_from='Age', values_from='Freq') %>%
+  t() 
+tab <- rbind(tab, `Num. samples`=as.numeric(get.counts(r.obj)))
+
+tab %>%
+  kable(digits=2, format = 'html') %>%
+  kable_styling(
+    bootstrap_options=c('striped', 'condensed'),
+    font_size=18, full_width=FALSE)
+```
+
+]
+
+.pull-right[
+
+- Number of young and old well balanced across the 13 plates
+- Number of samples per plate is also reasonable (plate capacity was set at 30 samples)
+
+]
+
+---
+
+class: inverse, middle, center
+
+# Calibration
+
+---
+
+# Calibration
+
+.large[
+
+- Calibration: developing a map from "raw" assay responses to concentrations (ng/ml) using samples of *known* concentrations
+- We will explore some approaches to calibration with methods from the `R` package `calibFit` `r Citep(bib=bib, c('calibFit', 'davidian1990'))`
+- The package includes some example data:
+  - High Performance Liquid Chromatography (HPLC) and 
+  - Enzyme Linked Immunosorbent Assay (ELISA)
+
+]
+
+---
+
+# Calibration
+
+.pull-leftWider[
+
+```{r calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(16/9)}
 data(HPLC)
 data(ELISA)
 
@@ -217,8 +463,109 @@ p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response)) +
 grid.arrange(p1,p2,nrow=1)
 ```
 
-## Calibration
+]
 
-@calibFit @davidian1990
+.pull-rightNarrower[
 
-## References
+- *Calibration* is *inverse regression* in which these fitted curves would be used to map assay responses from samples of unkown concentration (vertical axis) to concentration values (horizontal axis).
+- Both fits exhibit *heteroscedasticity*: the error variance is not constant with respect to Concentration
+- Most models assume *homoscedasticity*, or constant error variance.
+
+]
+
+---
+
+# Residuals (Response - Fitted values)
+
+```{r calibFit_residuals, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+p1 <- ggplot(HPLC, aes(x=Concentration, y=Response-Fitted)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+	xlab("Concentration (ng/ml)") +
+	ylab("Residuals") +
+	ggtitle("HPLC with ordinary least squares fit")
+
+p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response-Fitted)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+	xlab("log(Concentration (ng/ml))") +
+	ylab("Residuals") +
+	ggtitle("ELISA with 4 parameter logistic fit")
+
+grid.arrange(p1,p2,nrow=1)
+```
+
+---
+
+# Modeling Heterscedastic Errors
+
+The `calibFit` package includes models of the form: 
+
+\begin{equation}
+Y_{ij}=f(x_i,\beta)+\sigma g(\mu_i,z_i,\theta) \epsilon_{ij}, 
+\end{equation}
+
+for concentrations $i=1,\ldots,N$, replicates $j=1,\ldots,m_i$. 
+The function $g(\mu_i,z_i,\theta)$ allows the variances to depend on
+$\mu_i$ (the mean response $f(x_i,\beta)$), covariates $\{z_i\}$, and a parameter
+("known" or unknown) $\theta$.
+
+`calibFit` implements the Power of the Mean (POM) function
+
+\begin{equation}
+g(\mu_i,\theta) = \mu_i^{2\theta}
+\end{equation}
+
+which results in 
+
+\begin{equation}
+\operatorname{var}(Y_{ij}) = \sigma^2\mu_i^{2\theta}
+\end{equation}
+
+---
+
+# Residuals Fit with POM Variance
+
+```{r, calib_fit}
+cal.fpl <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl"))
+cal.lin.pom <- with(HPLC, calib.fit(Concentration,Response,type="lin.pom"))
+cal.fpl.pom <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl.pom"))
+
+linpom.fit <- cal.lin.pom@fitted.values
+fplpom.fit <- cal.fpl.pom@fitted.values
+
+sig.lin <- cal.lin.pom@sigma
+sig.fpl <- cal.fpl.pom@sigma
+
+theta.lin <- cal.lin.pom@theta
+theta.fpl <- cal.fpl.pom@theta
+
+linpom.res <- cal.lin.pom@residuals*(1/((linpom.fit^theta.lin)*sig.lin))
+fplpom.res <- cal.fpl.pom@residuals*(1/((fplpom.fit^theta.fpl)*sig.fpl))
+```
+
+```{r calibFit_pom_residuals, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+p1 <- ggplot(HPLC, aes(x=linpom.fit, y=linpom.res)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+	xlab("Fitted Values (LS-POM)") +
+	ylab("Standardized Residuals") +
+	ggtitle("HPLC data with least squares POM fit")
+
+p2 <- ggplot(ELISA, aes(x=fplpom.fit, y=fplpom.res)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+	xlab("Fitted Values (FPL-POM)") +
+	ylab("Standardized Residuals") +
+	ggtitle("ELISA with 4 parameter logistic POM fit")
+
+grid.arrange(p1,p2,nrow=1)
+```
+
+---
+
+# References
+
+```{r refs, echo=FALSE, results="asis"}
+PrintBibliography(bib)
+```

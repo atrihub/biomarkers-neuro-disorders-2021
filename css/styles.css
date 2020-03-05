@@ -1,0 +1,17 @@
+.pull-leftWider {
+  float: left;
+  width: 67%;
+}
+
+.pull-rightNarrower {
+  float: left;
+  width: 27%;
+}
+
+.large { font-size: 130% }
+.small { font-size: 70% }
+
+a, a > code {
+  color: #0000EE; /*default: rgb(249, 38, 114); || sets color of links */
+  text-decoration: none; /* turns off background coloring of links */
+}
