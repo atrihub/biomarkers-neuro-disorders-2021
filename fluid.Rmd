@@ -2,7 +2,7 @@
 title: Biostatistics for Fluid Biomarkers
 output: 
   xaringan::moon_reader:
-    self_contained:  false
+    self_contained:  true
     css: ["default", "default-fonts", "./css/styles.css"]
     seal: false 
     lib_dir: libs
@@ -29,6 +29,12 @@ library(plotly)
 library(gridExtra)
 library(calibFit)
 library(SRS)
+library(RefManageR)
+library(mixtools)
+library(SRS)
+library(pROC)
+library(party)
+
 options(digits=2)
 
 knitr::opts_chunk$set(
@@ -40,9 +46,9 @@ knitr::opts_chunk$set(
   dev='svg',
   tidy=FALSE,
   out.extra = '',
-  out.width='80%',
+  out.width='100%',
   fig.align = 'center', crop = TRUE, fig.pos = '!h', 
-  fig.height=3, fig.width=3*(16/9),
+  fig.height=3, fig.width=3*2,
   message = FALSE, 
   warning = FALSE
 )
@@ -69,7 +75,6 @@ scale_fill_discrete <-
 
 
 ```{r, load_refs, include=FALSE, cache=FALSE}
-library(RefManageR)
 BibOptions(check.entries = FALSE,
            bib.style = "authoryear",
            cite.style = "authoryear",
@@ -149,11 +154,16 @@ Emphases:
 # Session 1 Outline
 
 .large[
-- Batch effects
-- Randomization
-- Calibration
-- Regression
-- Classification
+- Batch Effects
+- Experimental Design (Sample Randomization)
+- Statistical Models for Assay Calibration/Quantification
+- Classification (Supervised Learning)
+  - Logistic Regression
+  - Binary Trees
+  - Random Forest
+- Mixture Modeling (Unsupervised Learning)
+  - Univariate
+  - Bivariate
 ]
 
 ---
@@ -284,7 +294,6 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
 We use an `R` package [SRS](https://github.com/atrihub/SRS) ("Subject Randomization System"), which we have modified to deal with the constraints of plate capacity, and keeping samples from the same subject together.
 
 ```{r randomization}
-library(SRS)
 data(srs_data)
 # head(srs_data)
 
@@ -433,7 +442,7 @@ class: inverse, middle, center
 
 .pull-leftWider[
 
-```{r calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(16/9)}
+```{r calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(2)}
 data(HPLC)
 data(ELISA)
 
@@ -478,7 +487,7 @@ grid.arrange(p1,p2,nrow=1)
 
 # Residuals (Response - Fitted values)
 
-```{r calibFit_residuals, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+```{r calibFit_residuals, out.width='100%', fig.height=4, fig.width=4*(2)}
 p1 <- ggplot(HPLC, aes(x=Concentration, y=Response-Fitted)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -572,7 +581,7 @@ linpom.res <- cal.lin.pom@residuals*(1/((linpom.fit^theta.lin)*sig.lin))
 fplpom.res <- cal.fpl.pom@residuals*(1/((fplpom.fit^theta.fpl)*sig.fpl))
 ```
 
-```{r calibFit_pom_residuals, out.width='80%', fig.height=4, fig.width=4*(16/9)}
+```{r calibFit_pom_residuals, out.width='100%', fig.height=4, fig.width=4*(2)}
 p1 <- ggplot(HPLC, aes(x=linpom.fit, y=linpom.res)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -594,7 +603,7 @@ grid.arrange(p1,p2,nrow=1)
 
 # HPLC Calibration With/Without POM Variance
 
-```{r, fig.height=4.5, fig.width=4.5*16/9}
+```{r, fig.height=4.5, fig.width=4.5*2}
 par(mfrow=c(1,2))
 ciu <- fitted(linmodel) + summary(linmodel)$sigma*qt(.975,linmodel$df)
 cil <- fitted(linmodel) - summary(linmodel)$sigma*qt(.975,linmodel$df)
@@ -611,7 +620,7 @@ plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentrati
 
 # Elisa Calibration With/Without POM Variance
 
-```{r, fig.height=4.5, fig.width=4.5*16/9}
+```{r, fig.height=4.5, fig.width=4.5*2}
 par(mfrow=c(1,2))
 #par(mar = c(3.5,3.5,1.5,1.5))
 plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", ylab = "Response")
@@ -646,26 +655,30 @@ plot(calib.fpl, main="ELISA calribated with FPL POM")
 
 # Calibration Statistics
 
-- Minimum Detectable Concentration (MDC) is the lowest concentration where the curve is increasing (decreasing)
+.large[
+- _Minimum Detectable Concentration (MDC)_ is the lowest concentration where the curve is increasing (decreasing)
   - For an increasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \leq \textrm{LCL}_0\}$
   - For a decreasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \geq \textrm{UCL}_0\}$
   - $\textrm{LCL}_0$ and $\textrm{UCL}_0$ are lower/upper confidence limits at 0
-- Reliable Detection Limit (RDL) for an increasing (decreasing) curve, is the lowest concentration that has a high probability of producing a response that is significantly greater (less) than the response at 0.
+- _Reliable Detection Limit (RDL)_ for an increasing (decreasing) curve, is the lowest concentration that has a high probability of producing a response that is significantly greater (less) than the response at 0.
   - For an increasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{UCL}_x \leq \textrm{LCL}_0\}$
   - For a decreasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{LCL}_x \geq \textrm{UCL}_0\}$
-- Limit of Quantitization (LOQ) is the lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
-
+- _Limit of Quantitization (LOQ)_ is the lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
+]
 ---
 
 class: inverse, middle, center
 
-# Classification
+# Supervised Learning
+
+## Classification
 
 ---
 
 # Classification
 
-```{r}
+.pull-leftWider[
+```{r, fig.height=4, fig.width=6}
 dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
   arrange(RID, EXAMDATE) %>%
   filter(!duplicated(RID)) %>%
@@ -677,9 +690,18 @@ dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
 
 ggplot(dd, aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
-  scale_color_manual(values=c("#0072B2", "#E69F00", "#D55E00"))
+  scale_color_manual(values=c("#0072B2", "#E69F00", "#D55E00")) +
+  theme(legend.position = c(0.80,0.75))
 ```
+]
+.pull-rightNarrower[
 
+- Data from [adni.loni.usc.edu](adni.loni.usc.edu)
+- CSF Abeta 1-42 and t-tau assayed using the automated Roche Elecsys and cobas e 601 immunoassay analyzer system
+- Filter time points associated with first assay, and ignore subsequent time points
+- We'll ignore MCI and focus on CN vs Dementia
+
+]
 ---
 
 # Classification
@@ -697,7 +719,6 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
 .pull-left[
 
 ```{r, fig.width=5, fig.height=5}
-library(pROC)
 roc_abeta <- roc((DX=='Dementia') ~ ABETA, subset(dd, DX!='MCI'))
 # ggroc(roc_abeta)
 plot(roc_abeta, print.thres="best", print.thres.best.method="youden")
@@ -771,7 +792,7 @@ roc.test(roc_abeta, roc_tauabeta)
 
 # Youden's Cutoff for Tau / $\textrm{A}\beta$ Ratio
 
-```{r}
+```{r, fig.height=2.5, fig.width=3*2}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
@@ -785,11 +806,12 @@ Line is Tau = 0.394 $\times$ Abeta (or Tau/Abeta = 0.394, Youden's cutoff)
 # Logistic Regression
 
 ```{r}
-logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), data = subset(dd, DX!='MCI'))
+logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), 
+  data = subset(dd, DX!='MCI'), family=binomial)
 summary(logistic.fit)$coef %>% as.data.frame() %>%
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
-  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  mutate(`Pr(>|z|)` = format.pval(round(`Pr(>|z|)`, digits = 3), eps = 0.001, digits=3)) %>%
   kable()
 ```
 
@@ -850,22 +872,27 @@ roc.test(roc_abeta, roc_logistic.fit)
 # Logistic Regression with Age and APOE
 
 ```{r}
-logistic.fit2 <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU) + scale(I(AGE+Years.bl)) + as.factor(APOE4), data = subset(dd, DX!='MCI'))
+logistic.fit2 <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU) + scale(I(AGE+Years.bl)) + as.factor(APOE4), family=binomial, data = subset(dd, DX!='MCI'))
 summary(logistic.fit2)$coef %>% 
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
-  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  mutate(`Pr(>|z|)` = format.pval(round(`Pr(>|z|)`, digits = 3), eps = 0.001, digits=3)) %>%
   kable()
 ```
 
+```{r, eval=FALSE}
+roc_logistic.fit2 <- roc((DX=='Dementia') ~ predict(logistic.fit2, type='response'), subset(dd, DX!='MCI'))
+roc.test(roc_abeta, roc_logistic.fit2)
+roc.test(roc_tauabeta, roc_logistic.fit2)
+auc(roc_logistic.fit2); ci(roc_logistic.fit2)
+```
 This model does not provide much better ROC.
 
 ---
 
 # Tree-based Methods
 
-```{r, fig.height=5, fig.width=5*(16/9)}
-library(party)
+```{r, fig.height=4.5, fig.width=5*(2)}
 tree.fit <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'), 
   controls = ctree_control(maxdepth=2))
 plot(tree.fit)
@@ -935,6 +962,175 @@ roc.test(roc_abeta, roc_tree.fit)
 roc.test(roc_abeta, roc_rf.fit)
 ```
 
+]
+
+---
+
+class: inverse, middle, center
+
+# Unsupervised Learning
+
+## Mixture Modeling
+
+---
+
+# Unsupervised Learning
+
+.large[
+- The classification techniques we just reviewed can be thought of as *Supervised Learning* in which we attempt to learn known "labels" (CN, Dementia).
+- *Mixture Modeling* is type of *Unsupervised Learning* technique in which we try to identify clusters of populations which appear to be arising from different distributions
+- Don't confuse *Mixture Models* with *Mixed-Effects Models* (which we'll discuss later)
+  - Think: "Mixture of Distributions"
+]
+
+---
+
+# Distribution of ABETA
+
+```{r, fig.height=2.25, fig.width=3*(2)}
+ggplot(subset(dd, DX!='MCI' & ABETA<1700), aes(x=ABETA)) + 
+  geom_histogram(aes(y=..density..), alpha=0.5) +
+  geom_density() +
+  geom_rug(aes(color=DX))
+```
+
+- Distribution is bimodal
+- Can we identify the two sub-distributions?
+- We'll explore with `mixtools` package `r Citep(bib, 'mixtools')`
+
+---
+
+# Distribution of ABETA
+
+```{r, results='hide', cache=TRUE}
+#' Plot a Mixture Component
+#' 
+#' @param x Input data
+#' @param mu Mean of component
+#' @param sigma Standard deviation of component
+#' @param lam Mixture weight of component
+plot_mix_comps <- function(x, mu, sigma, lam) {
+  lam * dnorm(x, mu, sigma)
+}
+
+set.seed(1)
+mixmdl <- normalmixEM(subset(dd, DX!='MCI' & ABETA<1700)$ABETA, k = 2)
+## number of iterations= 121
+
+set.seed(1)
+mvmixmdl <- mvnormalmixEM(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], k = 2)
+## number of iterations= 85
+```
+
+```{r}
+data.frame(ABETA = mixmdl$x) %>%
+  ggplot(aes(x=ABETA)) +
+  geom_histogram(aes(y=..density..), alpha=0.5) +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], mixmdl$sigma[1], lam = mixmdl$lambda[1]),
+                colour = "#D55E00", lwd = 1.5) +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], mixmdl$sigma[2], lam = mixmdl$lambda[2]),
+                colour = "#0072B2", lwd = 1.5) +
+  ylab("Density")
+```
+
+---
+
+# Posterior Membership Probabilities
+
+```{r}
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>%
+  arrange(x) %>% 
+  rename(Abeta = x, `Prob. Abnormal` = comp.1, `Prob. Normal` = comp.2)
+post.df %>% filter(Abeta > 1030 & Abeta < 1080) %>% kable()
+
+# A reasonable cutoff might be:
+# filter(post.df, `Prob. Abnormal` <= `Prob. Normal`)[1,]
+```
+
+---
+
+## Bivariate Density
+
+```{r}
+kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
+fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
+  showlegend = FALSE,
+  margin = list(l = 0, r = 0, b = 0, t = 0, pad = 0),
+  scene = list(
+      xaxis = list(title = "Abeta"),
+      yaxis = list(title = "Tau"),
+      zaxis = list(title = "Density")
+    ))
+
+htmlwidgets::saveWidget(fig, paste0("3dfig.html"))
+```
+
+<iframe src="3dfig.html" width="100%" height="500" id="igraph" scrolling="no" seamless="seamless" frameBorder="0"> </iframe>
+
+---
+
+# Bivariate Density Contour Plot
+
+```{r}
+kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
+kdl <- expand.grid(i=1:50, j=1:50) %>%
+  mutate(Abeta=NA, Tau=NA, density=NA)
+for(r in 1:nrow(kdl)){
+  kdl[r, 'Abeta'] <- kd$x[kdl$i[r]]
+  kdl[r, 'Tau'] <- kd$y[kdl$j[r]]
+  kdl[r, 'density'] <- kd$z[kdl$i[r], kdl$j[r]]
+}
+
+ggplot(kdl, aes(Abeta, Tau, z = density)) +
+  geom_raster(aes(fill=density))+
+  geom_contour(color='white')
+```
+
+---
+
+# Bivariate Mixture Model Posterior Probabilities
+
+.pull-left[
+```{r, fig.width=5, fig.height=5, out.width='100%'}
+post.df2 <- cbind(mvmixmdl$x, mvmixmdl$posterior) %>% 
+  as.data.frame() %>% 
+  rename(
+    `Prob. Abnormal` = comp.1,
+    `Prob. Normal` = comp.2
+  )
+
+ggplot(post.df2, aes(x=ABETA, y=TAU, color=`Prob. Abnormal`)) + 
+  geom_point() +
+  scale_colour_gradient(low="#0072B2", high="#D55E00") +
+  geom_abline(intercept = 0, slope=0.394) +
+  theme(legend.position=c(0.85, 0.82))
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5, out.width='100%'}
+plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10), 
+  marginal = FALSE, whichplots=3, main2='', 
+  xlab2='ABETA', ylab2='TAU')
+```
+]
+
+---
+
+# Summary
+
+.large[
+- Batch Effects
+- Experimental Design (Sample Randomization)
+- Statistical Models for Assay Calibration/Quantification
+- Classification (Supervised Learning)
+  - Logistic Regression
+  - Binary Trees
+  - Random Forest
+- Mixture Modeling (Unsupervised Learning)
+  - Univariate
+  - Bivariate
 ]
 
 ---
