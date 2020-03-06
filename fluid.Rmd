@@ -20,6 +20,7 @@ output:
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 # remotes::install_github('atrihub/SRS')
+# For ADNIMERGE, go to http://adni.loni.usc.edu/
 
 library(knitr)
 library(kableExtra)
@@ -530,7 +531,7 @@ Y_{ij}=f(x_i,\beta)+\sigma g(\mu_i,z_i,\theta) \epsilon_{ij},
 
 where,
 
-- $Y_{ij}$ are observed assay values/responses for $i$th individual ($i=1,\ldots,n$), $j$th replicate
+- $Y_{ij}$ are observed assay values/responses for $i$th individual ( $i=1,\ldots,n$ ), $j$th replicate
 - $g(\mu_i,z_i,\theta)$ is a function that allows the variances to depend on:
   - $\mu_i$ (the mean response $f(x_i,\beta)$), 
   - covariates $z_i$, and 
@@ -757,7 +758,7 @@ legend("bottomright",
 | Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc` | `r ci(roc_tauabeta)[c(1,3)]` |  <0.001      |
 $^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
 
-So the ratio of Tau/ $\textrm{A}\beta$ shows the best discrimination of NC from Dementia cases.
+So the ratio of Tau / $\textrm{A}\beta$ shows the best discrimination of NC from Dementia cases.
 
 ```{r, echo=FALSE, eval=FALSE}
 roc.test(roc_abeta, roc_tau)
@@ -768,7 +769,7 @@ roc.test(roc_abeta, roc_tauabeta)
 
 ---
 
-# Logistic Regression
+# Youden's Cutoff for Tau / $\textrm{A}\beta$ Ratio
 
 ```{r}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
@@ -784,13 +785,17 @@ Line is Tau = 0.394 $\times$ Abeta (or Tau/Abeta = 0.394, Youden's cutoff)
 # Logistic Regression
 
 ```{r}
-logistic.fit <- glm((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
-summary(logistic.fit)
+logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), data = subset(dd, DX!='MCI'))
+summary(logistic.fit)$coef %>% as.data.frame() %>%
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column(var='Coefficient') %>%
+  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  kable()
 ```
 
 ---
 
-# Logistic Regression
+# Logistic Regression Predicted Probabilities
 
 ```{r}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
@@ -832,10 +837,102 @@ legend("bottomright",
 | Logisitic model        | `r roc_logistic.fit$auc` | `r ci(roc_logistic.fit)[c(1,3)]` |  <0.001      |
 $^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
 
-Logisitic model is very similar to Tau/ $\textrm{A}\beta$ ratio.
+Logisitic model ROC is very similar to Tau/ $\textrm{A}\beta$ ratio ROC.
 
 ```{r, echo=FALSE, eval=FALSE}
 roc.test(roc_abeta, roc_logistic.fit)
+```
+
+]
+
+---
+
+# Logistic Regression with Age and APOE
+
+```{r}
+logistic.fit2 <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU) + scale(I(AGE+Years.bl)) + as.factor(APOE4), data = subset(dd, DX!='MCI'))
+summary(logistic.fit2)$coef %>% 
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column(var='Coefficient') %>%
+  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  kable()
+```
+
+This model does not provide much better ROC.
+
+---
+
+# Tree-based Methods
+
+```{r, fig.height=5, fig.width=5*(16/9)}
+library(party)
+tree.fit <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'), 
+  controls = ctree_control(maxdepth=2))
+plot(tree.fit)
+```
+
+`r Citet(bib=bib, 'ctree')`
+
+---
+
+# Tree-based Methods
+
+```{r}
+ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
+  geom_point(aes(color=DX)) +
+  scale_color_manual(values=c("#0072B2", "#D55E00")) +
+  geom_vline(xintercept = 886) +
+  #geom_hline(yintercept = 210) +
+  #geom_hline(yintercept = 440) +
+  geom_segment(aes(x = 0, y = 210, xend = 886, yend = 210)) +
+  geom_segment(aes(x = 886, y = 440, xend = 1700, yend = 440))
+```
+
+---
+
+# Comparing ROC Curves
+
+.pull-left[
+
+```{r, fig.width=5, fig.height=5}
+tree.fit2 <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
+rf.fit <- cforest((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
+roc_tree.fit <- roc((DX=='Dementia') ~ predict(tree.fit2, type='response')[,1], subset(dd, DX!='MCI'))
+roc_rf.fit <- roc((DX=='Dementia') ~ predict(rf.fit, type='response')[,1], subset(dd, DX!='MCI'))
+
+plot(roc_abeta, col='blue')
+plot(roc_tau, add=TRUE, col='orange')
+plot(roc_tauabeta, add=TRUE, col='red')
+plot(roc_logistic.fit, add=TRUE, col='purple')
+plot(roc_tree.fit, add=TRUE, col='grey')
+plot(roc_rf.fit, add=TRUE, col='black')
+legend("bottomright", 
+  legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta)), 
+      'Logistic model', 'Binary Tree', 'Random Forest'),
+    col=c("blue", "orange", "red", "purple", "grey", "black"), lwd=2)
+```
+
+]
+
+.pull-right[
+
+
+| Marker                 | AUC                      | 95% CI                           | P-value $^*$ |
+| ---------------------- |:------------------------:| --------------------------------:| ------------:|
+| $\textrm{A}\beta$      | `r roc_abeta$auc`        | `r ci(roc_abeta)[c(1,3)]`        |              |
+| Tau                    | `r roc_tau$auc`          | `r ci(roc_tau)[c(1,3)]`          |  0.07        |
+| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc`     | `r ci(roc_tauabeta)[c(1,3)]`     |  <0.001      |
+| Logisitic model        | `r roc_logistic.fit$auc` | `r ci(roc_logistic.fit)[c(1,3)]` |  <0.001      |
+| Binary Tree            | `r roc_tree.fit$auc`     | `r ci(roc_tree.fit)[c(1,3)]`     |  <0.001      |
+| Random Forest          | `r roc_rf.fit$auc`       | `r ci(roc_rf.fit)[c(1,3)]`       |  <0.001      |
+$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
+
+Random Forests `r Citep(bib=bib, c('breiman2001', 'hothorn2006'))` re-fit binary trees on random subsamples
+of the data, then aggregate resulting trees into a "forest". This results in smoother predictions and a smoother ROC curve.
+
+```{r, echo=FALSE, eval=FALSE}
+roc.test(roc_abeta, roc_tree.fit)
+roc.test(roc_abeta, roc_rf.fit)
 ```
 
 ]

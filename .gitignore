@@ -3,3 +3,6 @@
 .RData
 .Ruserdata
 *.Rproj
+fluid_fig
+libs
+README.html
