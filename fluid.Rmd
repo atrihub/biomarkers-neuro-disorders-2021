@@ -117,10 +117,10 @@ knitr::include_graphics("./images/actc_logo.png")
 .large[
 - 2001 - 2005: PhD Mathematics, University of California, San Diego
   - *Rank Regression & Synergy Detection*
-- 2005 - 2015: Biostatistician/Faculty, University of California, San Diego
+- 2005 - 2015: University of California, San Diego
   - Alzheimer's Disease Neuroimaging Initiative (ADNI)
   - Alzheimer's Disease Cooperative Study (ADCS)
-- 2015 - Present: Faculty, University of Southern California, San Diego
+- 2015 - Present: University of Southern California, San Diego
   - Associate Director of Biostatistics, [Alzheimer's Therapeutic Research Institute (ATRI)](https://keck.usc.edu/atri/)
   - Biostatistics Unit Co-Lead, [Alzheimer's Clinical Trial Consortium (ACTC)](https://www.actcinfo.org/)
 ]
@@ -497,6 +497,29 @@ grid.arrange(p1,p2,nrow=1)
 
 ---
 
+# Typical Regression
+
+Typically, regression models are of the form: 
+
+\begin{equation}
+Y_{i}=f(x_i,\beta)+\epsilon_{i}, 
+\end{equation}
+
+where:
+
+- $Y_{i}$ is the observed response/outcome for $i$th individual ( $i=1,\ldots,n$ ) 
+- $x_i$ are covariates/predictors for $i$th individual
+- $\beta$ are regression coefficients to be estimated
+- $f(\cdot,\cdot)$ is the model (assumed "known" or to be estimated)
+  - In linear regression $f(x_i,\beta)=x_i\beta$
+- $\epsilon_i$ is the residual error
+- We assume $\epsilon\sim\mathcal{N}(0,\sigma^2)$ 
+- $\sigma$ is the *constant* standard deviation (*homoscedastic*)
+
+If the standard deviation is not actually constant (*heteroscedastic*), estimates might be unreliable.
+
+---
+
 # Modeling Heteroscedastic Errors
 
 The `calibFit` package includes models of the form: 
@@ -505,12 +528,16 @@ The `calibFit` package includes models of the form:
 Y_{ij}=f(x_i,\beta)+\sigma g(\mu_i,z_i,\theta) \epsilon_{ij}, 
 \end{equation}
 
-for concentrations $i=1,\ldots,N$, replicates $j=1,\ldots,m_i$. 
-The function $g(\mu_i,z_i,\theta)$ allows the variances to depend on
-$\mu_i$ (the mean response $f(x_i,\beta)$), covariates $\{z_i\}$, and a parameter
-("known" or unknown) $\theta$.
+where,
 
-`calibFit` implements the Power of the Mean (POM) function
+- $Y_{ij}$ are observed assay values/responses for $i$th individual ($i=1,\ldots,n$), $j$th replicate
+- $g(\mu_i,z_i,\theta)$ is a function that allows the variances to depend on:
+  - $\mu_i$ (the mean response $f(x_i,\beta)$), 
+  - covariates $z_i$, and 
+  - a parameter ("known" or unknown) $\theta$.
+- $\epsilon_{ij}\sim\mathcal{N}(0,1)$ 
+
+In particular, `calibFit` implements the Power of the Mean (POM) function
 
 \begin{equation}
 g(\mu_i,\theta) = \mu_i^{2\theta}
@@ -524,7 +551,7 @@ which results in
 
 ---
 
-# Residuals Fit with POM Variance
+# Residuals From Fits with POM
 
 ```{r, calib_fit}
 cal.fpl <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl"))
@@ -550,17 +577,268 @@ p1 <- ggplot(HPLC, aes(x=linpom.fit, y=linpom.res)) +
   geom_hline(yintercept = 0) +
 	xlab("Fitted Values (LS-POM)") +
 	ylab("Standardized Residuals") +
-	ggtitle("HPLC data with least squares POM fit")
+	ggtitle("HPLC with least squares POM")
 
 p2 <- ggplot(ELISA, aes(x=fplpom.fit, y=fplpom.res)) +
   geom_point() +
   geom_hline(yintercept = 0) +
 	xlab("Fitted Values (FPL-POM)") +
 	ylab("Standardized Residuals") +
-	ggtitle("ELISA with 4 parameter logistic POM fit")
+	ggtitle("ELISA with 4 parameter logistic POM")
 
 grid.arrange(p1,p2,nrow=1)
 ```
+
+---
+
+# HPLC Calibration With/Without POM Variance
+
+```{r, fig.height=4.5, fig.width=4.5*16/9}
+par(mfrow=c(1,2))
+ciu <- fitted(linmodel) + summary(linmodel)$sigma*qt(.975,linmodel$df)
+cil <- fitted(linmodel) - summary(linmodel)$sigma*qt(.975,linmodel$df)
+
+plot(HPLC[, c('Concentration', 'Response')], main = "HPLC data fit without POM",col="blue",pch=16)
+lines(HPLC$Concentration,fitted(linmodel),col="lightblue")
+lines(HPLC$Concentration,ciu,col="lightblue",lty=2)
+lines(HPLC$Concentration,cil,col="grey",lty=2)
+
+plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentration", ylab = "Response")
+```
+
+---
+
+# Elisa Calibration With/Without POM Variance
+
+```{r, fig.height=4.5, fig.width=4.5*16/9}
+par(mfrow=c(1,2))
+#par(mar = c(3.5,3.5,1.5,1.5))
+plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", ylab = "Response")
+
+#par(mar = c(3.5,3.5,1.5,1.5))
+plot(cal.fpl.pom,print=FALSE,main = "ELISA fit with POM",xlab = "Concentration", ylab = "Response")
+```
+
+---
+
+# Calibrated Estimates for Each Sample
+
+.pull-left[
+
+```{r, fig.height=4.5, fig.width=4.5, out.width='100%'}
+calib.lin <- calib(cal.lin.pom, HPLC$Response)
+plot(calib.lin, main="HPLC calribated with linear POM")
+```
+
+]
+
+.pull-right[
+
+```{r, fig.height=4.5, fig.width=4.5, out.width='100%'}
+calib.fpl <- calib(cal.fpl.pom, ELISA$Response)
+plot(calib.fpl, main="ELISA calribated with FPL POM")
+```
+
+]
+
+---
+
+# Calibration Statistics
+
+- Minimum Detectable Concentration (MDC) is the lowest concentration where the curve is increasing (decreasing)
+  - For an increasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \leq \textrm{LCL}_0\}$
+  - For a decreasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \geq \textrm{UCL}_0\}$
+  - $\textrm{LCL}_0$ and $\textrm{UCL}_0$ are lower/upper confidence limits at 0
+- Reliable Detection Limit (RDL) for an increasing (decreasing) curve, is the lowest concentration that has a high probability of producing a response that is significantly greater (less) than the response at 0.
+  - For an increasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{UCL}_x \leq \textrm{LCL}_0\}$
+  - For a decreasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{LCL}_x \geq \textrm{UCL}_0\}$
+- Limit of Quantitization (LOQ) is the lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
+
+---
+
+class: inverse, middle, center
+
+# Classification
+
+---
+
+# Classification
+
+```{r}
+dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
+  arrange(RID, EXAMDATE) %>%
+  filter(!duplicated(RID)) %>%
+  mutate(
+    ABETA = as.numeric(gsub('<', '', gsub('>', '', ABETA))),
+    TAU = as.numeric(gsub('<', '', gsub('>', '', TAU))),
+    PTAU = as.numeric(gsub('<', '', gsub('>', '', PTAU)))
+  )
+
+ggplot(dd, aes(x=ABETA, y=TAU)) + 
+  geom_point(aes(color=DX)) +
+  scale_color_manual(values=c("#0072B2", "#E69F00", "#D55E00"))
+```
+
+---
+
+# Classification
+
+```{r}
+ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
+  geom_point(aes(color=DX)) +
+  scale_color_manual(values=c("#0072B2", "#D55E00"))
+```
+
+---
+
+# Reciever Operatoring Characteristic (ROC) Curves
+
+.pull-left[
+
+```{r, fig.width=5, fig.height=5}
+library(pROC)
+roc_abeta <- roc((DX=='Dementia') ~ ABETA, subset(dd, DX!='MCI'))
+# ggroc(roc_abeta)
+plot(roc_abeta, print.thres="best", print.thres.best.method="youden")
+```
+
+]
+
+.pull-right[
+
+For each potential threshold applied to CSF $\textrm{A}\beta 42$, 
+we calculate:
+- Sensitivity: True Positive Rate = TP/(TP+FN)
+- Specificity: True Negative Rate = TN/(TN+FP)
+
+This traces out the ROC curve.
+
+A typical summary of a classifier's performance is the
+Area Under the Curve (AUC)
+
+AUC=`r roc_abeta$auc` in this case, with 95% CI ( `r ci(roc_abeta)[c(1,3)]` )
+
+AUCs close to one indicate good performance.
+
+The threshold shown here maximizes the distance between the curve
+and the diagonal line (chance) `r Citep(bib=bib, 'Youden')`
+
+]
+
+---
+
+# Comparing ROC Curves
+
+.pull-left[
+
+```{r, fig.width=5, fig.height=5}
+roc_tau <- roc((DX=='Dementia') ~ TAU, subset(dd, DX!='MCI'))
+roc_tauabeta <- roc((DX=='Dementia') ~ I(TAU/ABETA), subset(dd, DX!='MCI'))
+
+plot(roc_abeta, col='blue')
+plot(roc_tau, add=TRUE, col='orange')
+plot(roc_tauabeta, add=TRUE, col='red',
+  print.thres="best", print.thres.best.method="youden")
+legend("bottomright", 
+  legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta))),
+       col=c("blue", "orange", "red"), lwd=2)
+
+```
+
+]
+
+.pull-right[
+
+
+| Marker                 | AUC                  | 95% CI                       | P-value $^*$ |
+| ---------------------- |:--------------------:| ----------------------------:| ------------:|
+| $\textrm{A}\beta$      | `r roc_abeta$auc`    | `r ci(roc_abeta)[c(1,3)]`    |              |
+| Tau                    | `r roc_tau$auc`      | `r ci(roc_tau)[c(1,3)]`      |  0.07        |
+| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc` | `r ci(roc_tauabeta)[c(1,3)]` |  <0.001      |
+$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
+
+So the ratio of Tau/ $\textrm{A}\beta$ shows the best discrimination of NC from Dementia cases.
+
+```{r, echo=FALSE, eval=FALSE}
+roc.test(roc_abeta, roc_tau)
+roc.test(roc_abeta, roc_tauabeta)
+```
+
+]
+
+---
+
+# Logistic Regression
+
+```{r}
+ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
+  geom_point(aes(color=DX)) +
+  scale_color_manual(values=c("#0072B2", "#D55E00")) +
+  geom_abline(intercept = 0, slope=0.394)
+```
+
+Line is Tau = 0.394 $\times$ Abeta (or Tau/Abeta = 0.394, Youden's cutoff)
+
+---
+
+# Logistic Regression
+
+```{r}
+logistic.fit <- glm((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
+summary(logistic.fit)
+```
+
+---
+
+# Logistic Regression
+
+```{r}
+ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
+  geom_point(aes(color=predict(logistic.fit, type='response'))) +
+  scale_colour_gradient(low="#0072B2", high="#D55E00") +
+  labs(color="Pred. prob. of Dementia") +
+  geom_abline(intercept = 0, slope=0.394)
+```
+
+---
+
+# Comparing ROC Curves
+
+.pull-left[
+
+```{r, fig.width=5, fig.height=5}
+roc_logistic.fit <- roc((DX=='Dementia') ~ predict(logistic.fit, type='response'), subset(dd, DX!='MCI'))
+
+plot(roc_abeta, col='blue')
+plot(roc_tau, add=TRUE, col='orange')
+plot(roc_tauabeta, add=TRUE, col='red')
+plot(roc_logistic.fit, add=TRUE, col='purple')
+legend("bottomright", 
+  legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta)), 'Logistic model'),
+       col=c("blue", "orange", "red", "purple"), lwd=2)
+
+```
+
+]
+
+.pull-right[
+
+
+| Marker                 | AUC                      | 95% CI                           | P-value $^*$ |
+| ---------------------- |:------------------------:| --------------------------------:| ------------:|
+| $\textrm{A}\beta$      | `r roc_abeta$auc`        | `r ci(roc_abeta)[c(1,3)]`        |              |
+| Tau                    | `r roc_tau$auc`          | `r ci(roc_tau)[c(1,3)]`          |  0.07        |
+| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc`     | `r ci(roc_tauabeta)[c(1,3)]`     |  <0.001      |
+| Logisitic model        | `r roc_logistic.fit$auc` | `r ci(roc_logistic.fit)[c(1,3)]` |  <0.001      |
+$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
+
+Logisitic model is very similar to Tau/ $\textrm{A}\beta$ ratio.
+
+```{r, echo=FALSE, eval=FALSE}
+roc.test(roc_abeta, roc_logistic.fit)
+```
+
+]
 
 ---
 
