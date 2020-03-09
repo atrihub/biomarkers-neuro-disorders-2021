@@ -1,0 +1,196 @@
+---
+title: Biostatistics for Imaging Biomarkers
+output: 
+  xaringan::moon_reader:
+    self_contained:  false
+    css: ["default", "default-fonts", "./css/styles.css"]
+    seal: false 
+    lib_dir: libs
+    nature:
+      # autoplay: 5000
+      highlightStyle: solarized-light
+      highlightLanguage: ["r", "css", "yaml"]
+      # slideNumberFormat: "" 
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+      titleSlideClass: [top, right]
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
+
+library(knitr)
+library(tidyverse)
+library(kableExtra)
+library(gridExtra)
+library(RefManageR)
+library(plotly)
+
+options(digits=2)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = NA,
+  echo = FALSE, cache = FALSE, 
+  cache.path = 'imaging_cache/',
+  fig.path = 'imaging_fig/',
+  dev='svg',
+  tidy=FALSE,
+  out.extra = '',
+  out.width='100%',
+  fig.align = 'center', crop = TRUE, fig.pos = '!h', 
+  fig.height=3, fig.width=3*2,
+  message = FALSE, 
+  warning = FALSE
+)
+# knitr::knit_hooks$set(inline = function(x) {
+#   prettyNum(x, big.mark=",")
+# })
+
+theme_set(theme_bw())
+
+# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <-
+    c("#0072B2", "#D55E00", "#E69F00",
+      "#009E73", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#CC79A7")
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+```
+
+
+```{r, load_refs, include=FALSE, cache=FALSE}
+BibOptions(check.entries = FALSE,
+           bib.style = "authoryear",
+           cite.style = "authoryear",
+           style = "markdown",
+           hyperlink = FALSE,
+           dashed = FALSE)
+bib <- ReadBib("./references.bib", check = FALSE)
+# Citet(), Citep(), AutoCite()
+```
+
+class: middle, center
+
+# Biostatistics for Imaging Biomarkers
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+April 20, 2020.
+
+.pull-left[
+
+```{r echo=FALSE, fig.align='center', out.width='57%'}
+knitr::include_graphics("./images/atri.png")
+```
+
+]
+
+
+.pull-right[
+
+```{r echo=FALSE, fig.align='center', out.width='47%'}
+knitr::include_graphics("./images/actc_logo.png")
+```
+
+]
+
+---
+
+# Session 2 Outline
+
+.large[
+- Reference Regions
+- Centiloids
+- Machine Learning
+]
+
+---
+
+class: inverse, middle, center
+
+# Reference Regions
+
+---
+
+# Reference Regions
+
+.large[
+A common issue with statistical analyses of numeric summaries derived from imaging data is normalization to a reference region. 
+
+Examples:
+
+- Volumetric MRI: regional (e.g. hippocampal) volume relative to IntraCranial Volume (ICV)
+- Amyloid PET: cortical-to-cerebellum Standardized Uptake Value Ratio (SUVr)
+
+(Also an issue in non-imaging data, e.g. ratio of CSF $\textrm{A}\beta_{1-42}$ to $\textrm{A}\beta_{1-40}$)
+]
+
+---
+
+# Beware the "Ratio Fallacy" and "Spurious Correlation"
+.large[
+> Spurious correlation refers to the correlation between indices that have a common component. A 'per ratio' standard is based on a biological measurement adjusted for some physical measurement by division. Renowned statisticians and biologists (Pearson, Neyman and Tanner) have warned about the problems in interpretation that ratios cause. This warning has been largely ignored. The consequences of using a single ratio as either the dependent or one of the independent variables in a multiple-regression analysis are described. It is shown that the use of ratios in regression analyses can lead to incorrect or misleading inferences. A recommendation is made that the use of ratios in regression analyses be avoided.
+
+`r Citet(bib, 'kronmal1993')` "Spurious correlation and the fallacy of the ratio standard revisited". *Journal of the Royal Statistical Society: Series A*.
+
+Examples abound: %ICV, SUVR, BMI, ...
+]
+
+---
+
+# Ratio as Dependent Variable in Regression
+
+```{r}
+dd2 <- subset(ADNIMERGE::adnimerge, VISCODE=='bl' & !is.na(Hippocampus) & DX=='CN') %>%
+  mutate(APOEe4 = ifelse(APOE4>0, 1, 0))
+```
+
+
+```{r, echo=TRUE}
+lm_fit_dx <- lm(Hippocampus ~ ICV + APOEe4, data=dd2)
+lm_fit2_dx <- lm(I(Hippocampus/ICV) ~ DX, data=dd2)
+summary(lm_fit_dx)
+summary(lm_fit2_dx)
+```
+
+---
+
+class: inverse, middle, center
+
+# Centiloids
+
+---
+
+# Centiloids
+
+---
+
+class: inverse, middle, center
+
+# Machine Learning
+
+---
+
+# Machine Learning
+
+---
+
+# References
+
+```{r refs, echo=FALSE, results="asis"}
+PrintBibliography(bib)
+```
