@@ -2,7 +2,7 @@
 title: Biostatistics for Fluid Biomarkers
 output: 
   xaringan::moon_reader:
-    self_contained:  true
+    self_contained:  false
     css: ["default", "default-fonts", "./css/styles.css"]
     seal: false 
     lib_dir: libs
@@ -20,18 +20,17 @@ output:
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 # remotes::install_github('atrihub/SRS')
-# For ADNIMERGE, go to http://adni.loni.usc.edu/
+# For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
 
 library(knitr)
-library(kableExtra)
 library(tidyverse)
-library(plotly)
+library(kableExtra)
 library(gridExtra)
+library(RefManageR)
+library(plotly)
 library(calibFit)
 library(SRS)
-library(RefManageR)
 library(mixtools)
-library(SRS)
 library(pROC)
 library(party)
 
@@ -247,7 +246,7 @@ anova(lm(Biomarker ~ batch, batch_data))
 
 # Batch effects: Confounds
 
-```{r}
+```{r batch_confounds}
 low_groups <- subset(batch_data_sum, Mean<median(batch_data_sum$Mean))$batch
 batch_data <- batch_data %>%
   mutate(Group = ifelse(batch %in% low_groups, 'A', 'B'))
@@ -267,7 +266,7 @@ class: inverse, middle, center
 
 # Randomized assignment of samples to plates
 
-```{r}
+```{r batch_randomized}
 batch_data$Group <- sample(batch_data$Group, size=nrow(batch_data))
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
@@ -603,7 +602,7 @@ grid.arrange(p1,p2,nrow=1)
 
 # HPLC Calibration With/Without POM Variance
 
-```{r, fig.height=4.5, fig.width=4.5*2}
+```{r calib_hplc_pom, fig.height=4.5, fig.width=4.5*2}
 par(mfrow=c(1,2))
 ciu <- fitted(linmodel) + summary(linmodel)$sigma*qt(.975,linmodel$df)
 cil <- fitted(linmodel) - summary(linmodel)$sigma*qt(.975,linmodel$df)
@@ -620,7 +619,7 @@ plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentrati
 
 # Elisa Calibration With/Without POM Variance
 
-```{r, fig.height=4.5, fig.width=4.5*2}
+```{r calib_elisa_pom, fig.height=4.5, fig.width=4.5*2}
 par(mfrow=c(1,2))
 #par(mar = c(3.5,3.5,1.5,1.5))
 plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", ylab = "Response")
@@ -635,7 +634,7 @@ plot(cal.fpl.pom,print=FALSE,main = "ELISA fit with POM",xlab = "Concentration",
 
 .pull-left[
 
-```{r, fig.height=4.5, fig.width=4.5, out.width='100%'}
+```{r calibrated1, fig.height=4.5, fig.width=4.5, out.width='100%'}
 calib.lin <- calib(cal.lin.pom, HPLC$Response)
 plot(calib.lin, main="HPLC calribated with linear POM")
 ```
@@ -644,7 +643,7 @@ plot(calib.lin, main="HPLC calribated with linear POM")
 
 .pull-right[
 
-```{r, fig.height=4.5, fig.width=4.5, out.width='100%'}
+```{r calibrated2, fig.height=4.5, fig.width=4.5, out.width='100%'}
 calib.fpl <- calib(cal.fpl.pom, ELISA$Response)
 plot(calib.fpl, main="ELISA calribated with FPL POM")
 ```
@@ -678,7 +677,7 @@ class: inverse, middle, center
 # Classification
 
 .pull-leftWider[
-```{r, fig.height=4, fig.width=6}
+```{r classification, fig.height=4, fig.width=6}
 dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
   arrange(RID, EXAMDATE) %>%
   filter(!duplicated(RID)) %>%
@@ -706,7 +705,7 @@ ggplot(dd, aes(x=ABETA, y=TAU)) +
 
 # Classification
 
-```{r}
+```{r classification_no_mci}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00"))
@@ -718,7 +717,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
 
 .pull-left[
 
-```{r, fig.width=5, fig.height=5}
+```{r ROC_abeta, fig.width=5, fig.height=5}
 roc_abeta <- roc((DX=='Dementia') ~ ABETA, subset(dd, DX!='MCI'))
 # ggroc(roc_abeta)
 plot(roc_abeta, print.thres="best", print.thres.best.method="youden")
@@ -753,7 +752,7 @@ and the diagonal line (chance) `r Citep(bib=bib, 'Youden')`
 
 .pull-left[
 
-```{r, fig.width=5, fig.height=5}
+```{r ROC_abeta_tau, fig.width=5, fig.height=5}
 roc_tau <- roc((DX=='Dementia') ~ TAU, subset(dd, DX!='MCI'))
 roc_tauabeta <- roc((DX=='Dementia') ~ I(TAU/ABETA), subset(dd, DX!='MCI'))
 
@@ -792,7 +791,7 @@ roc.test(roc_abeta, roc_tauabeta)
 
 # Youden's Cutoff for Tau / $\textrm{A}\beta$ Ratio
 
-```{r, fig.height=2.5, fig.width=3*2}
+```{r abeta_tau_scatter_youden, fig.height=2.5, fig.width=3*2}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
@@ -819,7 +818,7 @@ summary(logistic.fit)$coef %>% as.data.frame() %>%
 
 # Logistic Regression Predicted Probabilities
 
-```{r}
+```{r logistic_pred_prob}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=predict(logistic.fit, type='response'))) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
@@ -833,7 +832,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
 
 .pull-left[
 
-```{r, fig.width=5, fig.height=5}
+```{r ROC_logistic, fig.width=5, fig.height=5}
 roc_logistic.fit <- roc((DX=='Dementia') ~ predict(logistic.fit, type='response'), subset(dd, DX!='MCI'))
 
 plot(roc_abeta, col='blue')
@@ -892,7 +891,7 @@ This model does not provide much better ROC.
 
 # Tree-based Methods
 
-```{r, fig.height=4.5, fig.width=5*(2)}
+```{r tree1, fig.height=4.5, fig.width=5*(2)}
 tree.fit <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'), 
   controls = ctree_control(maxdepth=2))
 plot(tree.fit)
@@ -904,7 +903,7 @@ plot(tree.fit)
 
 # Tree-based Methods
 
-```{r}
+```{r tree2}
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
@@ -921,7 +920,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
 
 .pull-left[
 
-```{r, fig.width=5, fig.height=5}
+```{r ROC_rf, fig.width=5, fig.height=5}
 tree.fit2 <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 rf.fit <- cforest((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 roc_tree.fit <- roc((DX=='Dementia') ~ predict(tree.fit2, type='response')[,1], subset(dd, DX!='MCI'))
@@ -987,7 +986,7 @@ class: inverse, middle, center
 
 # Distribution of ABETA
 
-```{r, fig.height=2.25, fig.width=3*(2)}
+```{r density_Abeta, fig.height=2.25, fig.width=3*(2)}
 ggplot(subset(dd, DX!='MCI' & ABETA<1700), aes(x=ABETA)) + 
   geom_histogram(aes(y=..density..), alpha=0.5) +
   geom_density() +
@@ -1022,7 +1021,7 @@ mvmixmdl <- mvnormalmixEM(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')
 ## number of iterations= 85
 ```
 
-```{r}
+```{r mixture_distribution_Abeta}
 data.frame(ABETA = mixmdl$x) %>%
   ggplot(aes(x=ABETA)) +
   geom_histogram(aes(y=..density..), alpha=0.5) +
@@ -1053,7 +1052,7 @@ post.df %>% filter(Abeta > 1030 & Abeta < 1080) %>% kable()
 
 ## Bivariate Density
 
-```{r}
+```{r Bivariate_Density}
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
   showlegend = FALSE,
@@ -1064,16 +1063,16 @@ fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
       zaxis = list(title = "Density")
     ))
 
-htmlwidgets::saveWidget(fig, paste0("3dfig.html"))
+htmlwidgets::saveWidget(fig, "bvdensity_csf_tau.html")
 ```
 
-<iframe src="3dfig.html" width="100%" height="500" id="igraph" scrolling="no" seamless="seamless" frameBorder="0"> </iframe>
+<iframe src="bvdensity_csf_tau.html" width="100%" height="500" id="igraph" scrolling="no" seamless="seamless" frameBorder="0"> </iframe>
 
 ---
 
 # Bivariate Density Contour Plot
 
-```{r}
+```{r bv_kernel_density}
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 kdl <- expand.grid(i=1:50, j=1:50) %>%
   mutate(Abeta=NA, Tau=NA, density=NA)
@@ -1093,7 +1092,7 @@ ggplot(kdl, aes(Abeta, Tau, z = density)) +
 # Bivariate Mixture Model Posterior Probabilities
 
 .pull-left[
-```{r, fig.width=5, fig.height=5, out.width='100%'}
+```{r mvmix_post_prob, fig.width=5, fig.height=5, out.width='100%'}
 post.df2 <- cbind(mvmixmdl$x, mvmixmdl$posterior) %>% 
   as.data.frame() %>% 
   rename(
@@ -1109,7 +1108,7 @@ ggplot(post.df2, aes(x=ABETA, y=TAU, color=`Prob. Abnormal`)) +
 ```
 ]
 .pull-right[
-```{r, fig.width=5, fig.height=5, out.width='100%'}
+```{r mvmix_density, fig.width=5, fig.height=5, out.width='100%'}
 plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10), 
   marginal = FALSE, whichplots=3, main2='', 
   xlab2='ABETA', ylab2='TAU')
