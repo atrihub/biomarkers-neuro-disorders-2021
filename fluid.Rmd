@@ -807,7 +807,7 @@ Line is Tau = 0.394 $\times$ Abeta (or Tau/Abeta = 0.394, Youden's cutoff)
 ```{r}
 logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), 
   data = subset(dd, DX!='MCI'), family=binomial)
-summary(logistic.fit)$coef %>% as.data.frame() %>%
+summary(logistic.fit)$coef %>%
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
   mutate(`Pr(>|z|)` = format.pval(round(`Pr(>|z|)`, digits = 3), eps = 0.001, digits=3)) %>%

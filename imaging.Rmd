@@ -159,14 +159,122 @@ dd2 <- subset(ADNIMERGE::adnimerge, VISCODE=='bl' & !is.na(Hippocampus) & DX=='C
   mutate(APOEe4 = ifelse(APOE4>0, 1, 0))
 ```
 
-
 ```{r, echo=TRUE}
-lm_fit_dx <- lm(Hippocampus ~ ICV + APOEe4, data=dd2)
-lm_fit2_dx <- lm(I(Hippocampus/ICV) ~ DX, data=dd2)
-summary(lm_fit_dx)
-summary(lm_fit2_dx)
+lm_fit1_gender <- lm(I(Hippocampus/ICV*100) ~ PTGENDER, data=dd2)
 ```
 
+```{r}
+summary(lm_fit1_gender)$coef %>%
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column(var='Coefficient') %>%
+  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  kable()
+```
+
+- Signficant association between Gender and Hippocampal Volume (%ICV)!
+- (This is linear model is essential just a two-sample t-test)
+- Model fit to ADNI CN
+
+---
+
+# ICV as Covariate Instead of Denominator
+
+```{r, echo=TRUE}
+lm_fit2_gender <- lm(Hippocampus ~ ICV + PTGENDER, data=dd2)
+```
+
+```{r}
+summary(lm_fit2_gender)$coef %>%
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column(var='Coefficient') %>%
+  mutate(`Pr(>|t|)` = format.pval(round(`Pr(>|t|)`, digits = 3), eps = 0.001, digits=3)) %>%
+  kable()
+```
+
+- No association between Gender and Hippocampal Volume ( $\text{mm}^3$ )!
+- The **spurious association** in first model is driven by denominator (ICV), not numerator (hippocampal volume)
+
+---
+
+# Hippocampus vs ICV and Gender
+
+.pull-leftWider[
+```{r hipp_gender_scatter, fig.height=4, fig.width=6}
+ggplot(dd2, aes(y=Hippocampus, x=ICV, color=PTGENDER)) +
+  geom_point(alpha=0.5) +
+  geom_smooth(method='lm') +
+  xlab(expression(paste("ICV (", m*m^{3},")"))) +
+  ylab(expression(paste("Hippocampus (", m*m^{3},")"))) +
+  theme(legend.position = c(0.2, 0.8))
+```
+]
+
+.pull-rightNarrower[
+
+- For a given ICV, there is not much difference between genders
+- Theses linear fits are more flexible than model above (two slopes for ICV vs one)
+
+]
+
+---
+
+# Hippocampal volume ( $\textrm{mm}^3$, %ICV, and model-adjusted)
+
+```{r hipp_gender_box, fig.height=4, fig.width=4*2}
+p1 <- ggplot(dd2, aes(y=Hippocampus, x=PTGENDER)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(binaxis='y', stackdir='center', 
+    dotsize=0.3, alpha=0.2, binwidth=100) +
+  xlab('') + ylab(expression(paste("Hippocampus (", m*m^{3},")")))
+
+p2 <- ggplot(dd2, aes(y=ICV, x=PTGENDER)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(binaxis='y', stackdir='center', 
+    dotsize=0.3, alpha=0.2, binwidth=15000) +
+  xlab('') + ylab(expression(paste("ICV (", m*m^{3},")")))
+
+p3 <- ggplot(dd2, aes(y=(Hippocampus/ICV*100), x=PTGENDER)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(binaxis='y', stackdir='center', 
+    dotsize=0.3, alpha=0.2, binwidth=0.0075) +
+  xlab('') + ylab("Hippocampus (%ICV)")
+
+p4 <- ggplot(dd2, 
+  aes(y=Hippocampus-ICV*coef(lm_fit2_gender)['ICV'], x=PTGENDER)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_dotplot(binaxis='y', stackdir='center', 
+    dotsize=0.3, alpha=0.2, binwidth=100) +
+  xlab('') + ylab(expression(paste("Hippocampus (", m*m^{3},", model-adjusted for ICV)")))
+
+grid.arrange(p1,p2,p3,p4, nrow=1)
+```
+
+---
+
+# Hippocampal volume ( $\textrm{mm}^3$, %ICV, and model-adjusted)
+
+.pull-leftWider[
+```{r hipp_adj_gender_scatter, fig.height=4, fig.width=6}
+ggplot(dd2, 
+  aes(y=Hippocampus-ICV*coef(lm_fit2_gender)['ICV'], x=ICV, color=PTGENDER)) +
+  geom_point(alpha=0.5) +
+  geom_smooth(method='lm') +
+  xlab(expression(paste("ICV (", m*m^{3},")"))) +
+  ylab(expression(paste("Hippocampus (", m*m^{3},", model-adjusted for ICV)"))) +
+  theme(legend.position = c(0.2, 0.8))
+```
+]
+
+.pull-rightNarrower[
+
+- Model: 
+.small[
+$Y_i=\beta_0 + \beta_{\textrm{ICV}}\textrm{ICV}_i  + \beta_{\textrm{Male}}\textrm{Male}_i + \varepsilon_i$
+]
+- Adusted volume: $Y_i - \hat{\beta}_{\textrm{ICV}}\textrm{ICV}_i$ 
+- Adjustment removes slope for ICV
+
+]
 ---
 
 class: inverse, middle, center
