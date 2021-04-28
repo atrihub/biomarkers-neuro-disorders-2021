@@ -96,7 +96,7 @@ University of Southern California
 
 University of Gothenburg
 
-April 20, 2020.
+May 26, 2021
 
 .pull-left[
 
@@ -117,21 +117,6 @@ knitr::include_graphics("./images/actc_logo.png")
 
 ---
 
-#  About me
-
-.large[
-- 2001 - 2005: PhD Mathematics, University of California, San Diego
-  - *Rank Regression & Synergy Detection*
-- 2005 - 2015: University of California, San Diego
-  - Alzheimer's Disease Neuroimaging Initiative (ADNI)
-  - Alzheimer's Disease Cooperative Study (ADCS)
-- 2015 - Present: University of Southern California, San Diego
-  - Associate Director of Biostatistics, [Alzheimer's Therapeutic Research Institute (ATRI)](https://keck.usc.edu/atri/)
-  - Biostatistics Unit Co-Lead, [Alzheimer's Clinical Trial Consortium (ACTC)](https://www.actcinfo.org/)
-]
-
----
-
 # Course Overview
 
 .large[
@@ -143,9 +128,9 @@ Topics:
 
 Emphases:
 
-- Visuliazation 
+- Visualization 
 - Demonstrations using R, code available from:
-  - [https://github.com/atrihub/biomarkers-neuro-disorders-2020](https://github.com/atrihub/biomarkers-neuro-disorders-2020)
+  - [https://github.com/atrihub/biomarkers-neuro-disorders-2021](https://github.com/atrihub/biomarkers-neuro-disorders-2021)
 ]
 
 ---
@@ -173,27 +158,28 @@ class: inverse, middle, center
 
 ---
 
-
 # Batch Effects: Boxplot
 
 ```{r generate_batch_data}
 # simulated data with batch effects
 set.seed(20200225)
-# variance for each batch
-Sigma <- rgamma(n=10, shape=360/10, scale=10)
-# Mean for each batch
-Mean <- rnorm(n=10, mean=850, sd=200)
 
-batch_data <- expand.grid(
-  batch = 1:10,
-  id = 1:50
-) %>%
-  mutate(id = paste(batch, id, sep="_")) %>%
+batch_data <- 
+  tibble(
+    batch = 1:10,
+    Sigma = rgamma(n=10, shape=360/10, scale=10), # variance for each batch
+    Mean = rnorm(n=10, mean=850, sd=200)) %>% # Mean for each batch
+  group_by(batch) %>%
+  nest() %>%
+  mutate(Biomarker = map(data, ~ rnorm(n=50, .$Mean, .$Sigma))) %>%
+  unnest(Biomarker) %>%
+  unnest(data) %>%
+  ungroup() %>%
   arrange(batch) %>%
-  mutate(batch = as.factor(batch))
-batch_data$Biomarker <- unlist(lapply(1:10, function(i) rnorm(n=50, mean=Mean[i], sd=Sigma[i])))
-batch_data <- batch_data %>%
-  mutate(Biomarker = ifelse(Biomarker<0, 0, Biomarker))
+  mutate(
+    id = 1:(10*50),
+    batch = as.factor(batch),
+    Biomarker = ifelse(Biomarker<0, 0, Biomarker))
 ```
 
 ```{r batch_data_plot}
@@ -256,6 +242,12 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 ```
 
+???
+
+Suppose we have groups of interest (say, active vs placebo) that we would like to compare.
+
+Do we see an problem here?
+
 ---
 
 class: inverse, middle, center
@@ -274,6 +266,13 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 ```
 
+???
+
+If we have both groups represented in each batch, we can disentangle batch effects
+and group effects
+
+One way to ensure this, is to randomize samples to batches
+
 ---
 
 # Experimental Design for Fluid Biomarkers
@@ -291,6 +290,8 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
 # Sample Randomization
 
 We use an `R` package [SRS](https://github.com/atrihub/SRS) ("Subject Randomization System"), which we have modified to deal with the constraints of plate capacity, and keeping samples from the same subject together.
+
+(Note this is different than the `SRS` package on CRAN)
 
 ```{r randomization}
 data(srs_data)
@@ -432,8 +433,13 @@ class: inverse, middle, center
 - The package includes some example data:
   - High Performance Liquid Chromatography (HPLC) and 
   - Enzyme Linked Immunosorbent Assay (ELISA)
+- These examples are taken straight from the package vignette
 
 ]
+
+???
+
+The package is not actively maintained, so you must install the package from the CRAN archive
 
 ---
 
@@ -558,9 +564,13 @@ which results in
 \operatorname{var}(Y_{ij}) = \sigma^2\mu_i^{2\theta}
 \end{equation}
 
+???
+
+allowing the variance can depend on the mean.
+
 ---
 
-# Residuals From Fits with POM
+# "Homogenized" Residuals From Fits with POM
 
 ```{r, calib_fit}
 cal.fpl <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl"))
@@ -615,6 +625,10 @@ lines(HPLC$Concentration,cil,col="grey",lty=2)
 plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentration", ylab = "Response")
 ```
 
+???
+
+The mean does not change much, but we get more accurate 95% confidence bands
+
 ---
 
 # Elisa Calibration With/Without POM Variance
@@ -650,20 +664,28 @@ plot(calib.fpl, main="ELISA calribated with FPL POM")
 
 ]
 
+???
+
+* MDC is Minimum Detectable Concentration, which we'll define on the next slide
+
 ---
 
 # Calibration Statistics
 
-.large[
-- _Minimum Detectable Concentration (MDC)_ is the lowest concentration where the curve is increasing (decreasing)
-  - For an increasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \leq \textrm{LCL}_0\}$
-  - For a decreasing curve, $x_{\textrm{MDC}} = \min\{x : f(x, \beta) \geq \textrm{UCL}_0\}$
-  - $\textrm{LCL}_0$ and $\textrm{UCL}_0$ are lower/upper confidence limits at 0
-- _Reliable Detection Limit (RDL)_ for an increasing (decreasing) curve, is the lowest concentration that has a high probability of producing a response that is significantly greater (less) than the response at 0.
-  - For an increasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{UCL}_x \leq \textrm{LCL}_0\}$
-  - For a decreasing curve, $x_{\textrm{RDL}} = \min\{x : \textrm{LCL}_x \geq \textrm{UCL}_0\}$
-- _Limit of Quantitization (LOQ)_ is the lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
-]
+Assuming calibration curve $f$, mapping concentrations to assay responses, is increasing, we define the following terms.
+
+**Minimum Detectable Concentration (MDC)**: The lowest concentration where the curve is increasing, or:
+
+  $$x_{\textrm{MDC}} = \min\{x : f(x, \beta) > \textrm{UCL}_0\}$$
+  
+  where $\textrm{UCL}_0$ is the upper confidence limit at 0
+
+**Reliable Detection Limit (RDL)**: The lowest concentration that has a high probability of producing a response that is significantly greater than the response at 0, or 
+  
+$$x_{\textrm{RDL}} = \min\{x : \textrm{LCL}_x > \textrm{UCL}_0 \}$$
+
+**Limit of Quantitization (LOQ)**: The lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
+
 ---
 
 class: inverse, middle, center
