@@ -6,22 +6,22 @@ Statistical and visualization techniques will be demonstrated using [R](https://
 [RStudio](https://rstudio.com/products/rstudio/) is also highly recommended.
 
 
-The biostatistics module is from *9:00AM to 12:00PM Tuesday May 25, 2021*. Topics include:
+The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 2021*. Topics include:
 
-### Biostatistics for Fluid Biomarkers (9:00-9:50)
+### Biostatistics for Fluid Biomarkers (16:00-16:50)
 
 * Calibration
 * Batch effects
 * Regression
 * Classification
 
-### Biostatistics for Imaging Biomarkers (10:00-10:50)
+### Biostatistics for Imaging Biomarkers (17:00-17:50)
 
 * Reference regions
 * Centiloids
 * Machine learning
 
-### Longitudinal Date (11:00-11:50)
+### Longitudinal Date (18:00-18:50)
 
 * Visualizing longitudinal Data
 * Mixed-effect models
