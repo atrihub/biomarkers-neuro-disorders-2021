@@ -10,19 +10,25 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
 
 ### Biostatistics for Fluid Biomarkers (16:00-16:50)
 
-* Calibration
-* Batch effects
-* Regression
-* Classification
+- Batch Effects
+- Experimental Design (Sample Randomization)
+- Statistical Models for Assay Calibration/Quantification
+- Classification (Supervised Learning)
+  - Logistic Regression
+  - Binary Trees
+  - Random Forest
+- Mixture Modeling (Unsupervised Learning)
+  - Univariate
+  - Bivariate
 
 ### Biostatistics for Imaging Biomarkers (17:00-17:50)
 
-* Reference regions
-* Centiloids
-* Machine learning
+- Reference Regions
+- Centiloids
+- Machine Learning
 
 ### Longitudinal Date (18:00-18:50)
 
-* Visualizing longitudinal Data
-* Mixed-effect models
-* Modeling correlated residuals
+- Visualizing longitudinal Data
+- Mixed-effect models
+- Modeling correlated residuals
