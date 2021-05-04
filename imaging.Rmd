@@ -17,6 +17,20 @@ output:
       titleSlideClass: [top, right]
 ---
 
+class: middle, center
+
+# Biostatistics for Imaging Biomarkers
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+May 26, 2021
+
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
 
@@ -29,6 +43,24 @@ library(plotly)
 
 options(digits=2)
 
+theme_set(theme_bw())
+
+# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <-
+    c("#0072B2", "#D55E00", "#E69F00",
+      "#009E73", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#CC79A7")
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+```
+  
+```{r knitr-options, echo=FALSE, message=FALSE, warning=FALSE, purl=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = NA,
@@ -47,26 +79,11 @@ knitr::opts_chunk$set(
 # knitr::knit_hooks$set(inline = function(x) {
 #   prettyNum(x, big.mark=",")
 # })
-
-theme_set(theme_bw())
-
-# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
-cbbPalette <-
-    c("#0072B2", "#D55E00", "#E69F00",
-      "#009E73", "#F0E442", "#999999",
-      "#000000", "#56B4E9", "#CC79A7")
-scale_colour_discrete <-
-    function(...) scale_colour_manual(..., values = cbbPalette)
-scale_fill_discrete <-
-    function(...) scale_fill_manual(..., values = cbbPalette)
-scale_colour_discrete <-
-    function(...) scale_colour_manual(..., values = cbbPalette)
-scale_fill_discrete <-
-    function(...) scale_fill_manual(..., values = cbbPalette)
+# purl('imaging.Rmd')
 ```
 
 
-```{r, load_refs, include=FALSE, cache=FALSE}
+```{r, load_refs, include=FALSE, cache=FALSE, purl=FALSE}
 BibOptions(check.entries = FALSE,
            bib.style = "authoryear",
            cite.style = "authoryear",
@@ -77,23 +94,9 @@ bib <- ReadBib("./references.bib", check = FALSE)
 # Citet(), Citep(), AutoCite()
 ```
 
-class: middle, center
-
-# Biostatistics for Imaging Biomarkers
-
-Michael Donohue, PhD
-
-University of Southern California
-
-### Biomarkers in Neurodegenerative Disorders
-
-University of Gothenburg
-
-May 26, 2021
-
 .pull-left[
 
-```{r echo=FALSE, fig.align='center', out.width='57%'}
+```{r echo=FALSE, fig.align='center', out.width='57%', purl=FALSE}
 knitr::include_graphics("./images/atri.png")
 ```
 
@@ -102,7 +105,7 @@ knitr::include_graphics("./images/atri.png")
 
 .pull-right[
 
-```{r echo=FALSE, fig.align='center', out.width='47%'}
+```{r echo=FALSE, fig.align='center', out.width='47%', purl=FALSE}
 knitr::include_graphics("./images/actc_logo.png")
 ```
 
@@ -254,6 +257,7 @@ grid.arrange(p1,p2,p3,p4, nrow=1)
 # Hippocampal volume ( $\textrm{mm}^3$, %ICV, and model-adjusted)
 
 .pull-leftWider[
+
 ```{r hipp_adj_gender_scatter, fig.height=4, fig.width=6}
 ggplot(dd2, 
   aes(y=Hippocampus-ICV*coef(lm_fit2_gender)['ICV'], x=ICV, color=PTGENDER)) +
@@ -263,6 +267,7 @@ ggplot(dd2,
   ylab(expression(paste("Hippocampus (", m*m^{3},", model-adjusted for ICV)"))) +
   theme(legend.position = c(0.2, 0.8))
 ```
+
 ]
 
 .pull-rightNarrower[
@@ -275,6 +280,7 @@ $Y_i=\beta_0 + \beta_{\textrm{ICV}}\textrm{ICV}_i  + \beta_{\textrm{Male}}\textr
 - Adjustment removes slope for ICV
 
 ]
+
 ---
 
 class: inverse, middle, center
