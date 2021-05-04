@@ -27,7 +27,7 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
 - Centiloids
 - Machine Learning
 
-### Longitudinal Date (18:00-18:50)
+### Longitudinal Data (18:00-18:50)
 
 - Visualizing longitudinal Data
 - Mixed-effect models
