@@ -72,7 +72,7 @@ knitr::opts_chunk$set(
   out.extra = '',
   out.width='100%',
   fig.align = 'center', crop = TRUE, fig.pos = '!h', 
-  fig.height=3, fig.width=3*2,
+  fig.height=3, fig.width=3*2.2,
   message = FALSE, 
   warning = FALSE
 )

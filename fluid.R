@@ -1,37 +1,4 @@
----
-title: Biostatistics for Fluid Biomarkers
-output: 
-  xaringan::moon_reader:
-    self_contained:  false
-    css: ["default", "default-fonts", "./css/styles.css"]
-    seal: false 
-    lib_dir: libs
-    nature:
-      # autoplay: 5000
-      highlightStyle: solarized-light
-      highlightLanguage: ["r", "css", "yaml"]
-      # slideNumberFormat: "" 
-      highlightLines: true
-      countIncrementalSlides: false
-      ratio: "16:9"
-      titleSlideClass: [top, right]
----
-
-class: middle, center
-
-# Biostatistics for Fluid Biomarkers
-
-Michael Donohue, PhD
-
-University of Southern California
-
-### Biomarkers in Neurodegenerative Disorders
-
-University of Gothenburg
-
-May 26, 2021
-
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+## ----setup, echo=FALSE, message=FALSE, warning=FALSE------------------------------------------------
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 # remotes::install_github('atrihub/SRS')
 # For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
@@ -65,104 +32,21 @@ scale_colour_discrete <-
     function(...) scale_colour_manual(..., values = cbbPalette)
 scale_fill_discrete <-
     function(...) scale_fill_manual(..., values = cbbPalette)
-```
-  
-```{r knitr-options, echo=FALSE, message=FALSE, warning=FALSE, purl=FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = NA,
-  echo = FALSE, cache = FALSE, 
-  cache.path = 'fluid_cache/',
-  fig.path = 'fluid_fig/',
-  dev='svg',
-  tidy=FALSE,
-  out.extra = '',
-  out.width='100%',
-  fig.align = 'center', crop = TRUE, fig.pos = '!h', 
-  fig.height=3, fig.width=3*2.2,
-  message = FALSE, 
-  warning = FALSE
-)
-# knitr::knit_hooks$set(inline = function(x) {
-#   prettyNum(x, big.mark=",")
-# })
-# purl('fluid.Rmd')
-```
 
-```{r, load_refs, include=FALSE, cache=FALSE, purl=FALSE}
-BibOptions(check.entries = FALSE,
-           bib.style = "authoryear",
-           cite.style = "authoryear",
-           style = "markdown",
-           hyperlink = FALSE,
-           dashed = FALSE)
-bib <- ReadBib("./references.bib", check = FALSE)
-# Citet(), Citep(), AutoCite()
-```
 
-.pull-left[
 
-```{r echo=FALSE, fig.align='center', out.width='57%'}
+
+
+
+## ----echo=FALSE, fig.align='center', out.width='57%'------------------------------------------------
 knitr::include_graphics("./images/atri.png")
-```
-
-]
 
 
-.pull-right[
-
-```{r echo=FALSE, fig.align='center', out.width='47%'}
+## ----echo=FALSE, fig.align='center', out.width='47%'------------------------------------------------
 knitr::include_graphics("./images/actc_logo.png")
-```
 
-]
 
----
-
-# Course Overview
-
-.large[
-Topics:
-
-- 9:00 - 9:50 -- Biostatistics for Fluid Biomarkers
-- 10:00 - 10:50 -- Biostatistics for Imaging Biomarkers
-- 11:00 - 11:50 -- Modeling Longitudinal Data
-
-Emphases:
-
-- Visualization 
-- Demonstrations using R, code available from:
-  - [https://github.com/atrihub/biomarkers-neuro-disorders-2021](https://github.com/atrihub/biomarkers-neuro-disorders-2021)
-]
-
----
-
-# Session 1 Outline
-
-.large[
-- Batch Effects
-- Experimental Design (Sample Randomization)
-- Statistical Models for Assay Calibration/Quantification
-- Classification (Supervised Learning)
-  - Logistic Regression
-  - Binary Trees
-  - Random Forest
-- Mixture Modeling (Unsupervised Learning)
-  - Univariate
-  - Bivariate
-]
-
----
-
-class: inverse, middle, center
-
-# Batch Effects
-
----
-
-# Batch Effects: Boxplot
-
-```{r generate_batch_data}
+## ----generate_batch_data----------------------------------------------------------------------------
 # simulated data with batch effects
 set.seed(20200225)
 
@@ -182,21 +66,15 @@ batch_data <-
     id = 1:(10*50),
     batch = as.factor(batch),
     Biomarker = ifelse(Biomarker<0, 0, Biomarker))
-```
 
-```{r batch_data_plot}
+
+## ----batch_data_plot--------------------------------------------------------------------------------
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
   geom_dotplot(binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
-```
 
----
 
-# Coefficient of Variation
-
-.pull-left[
-
-```{r batch_data_summaries, results='asis', cache=FALSE}
+## ----batch_data_summaries, results='asis', cache=FALSE----------------------------------------------
 batch_data_sum <- batch_data %>% group_by(batch) %>%
   summarize(
     N=length(Biomarker),
@@ -208,33 +86,13 @@ batch_data_sum %>%
   kable_styling(
     bootstrap_options=c('striped', 'condensed'),
     font_size=18, full_width=FALSE)
-```
 
-]
 
-.pull-right[
-
-- Coefficient of Variation (CV) = SD/Mean
-- Often used for quality control (reject batch with CV > $x$)
-
-]
-
----
-
-# Testing for Batch Effects
-
-```{r, echo=TRUE, results='markup'}
+## ---- echo=TRUE, results='markup'-------------------------------------------------------------------
 anova(lm(Biomarker ~ batch, batch_data))
-```
 
-* Batch explains a significant amount of the variation in this simulated data
-* R note: `batch` variable must be a `factor`, not `numeric` (otherwise, you will get a batch slope)
 
----
-
-# Batch effects: Confounds
-
-```{r batch_confounds}
+## ----batch_confounds--------------------------------------------------------------------------------
 low_groups <- subset(batch_data_sum, Mean<median(batch_data_sum$Mean))$batch
 batch_data <- batch_data %>%
   mutate(Group = ifelse(batch %in% low_groups, 'A', 'B'))
@@ -242,60 +100,17 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
   geom_dotplot(aes(color=Group, fill=Group), 
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
-```
 
-???
 
-Suppose we have groups of interest (say, active vs placebo) that we would like to compare.
-
-Do we see an problem here?
-
----
-
-class: inverse, middle, center
-
-# Experimental Design for Fluid Biomarkers
-
----
-
-# Randomized assignment of samples to plates
-
-```{r batch_randomized}
+## ----batch_randomized-------------------------------------------------------------------------------
 batch_data$Group <- sample(batch_data$Group, size=nrow(batch_data))
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
   geom_dotplot(aes(color=Group, fill=Group), 
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
-```
 
-???
 
-If we have both groups represented in each batch, we can disentangle batch effects
-and group effects
-
-One way to ensure this, is to randomize samples to batches
-
----
-
-# Experimental Design for Fluid Biomarkers
-
-.large[
-- Randomize samples to batches/plates
-- Longitudinally collected samples (samples collected over time on same individual):
-  - If batch effects are expected to be larger than storage effects, consider randomizing *individuals* to batches
-  - (Keep all samples from individual on the same plate)
-- Randomization can be stratified to ensure important factors (e.g. treatment group, age, APOE $\epsilon4$) are balanced
-]
-
----
-
-# Sample Randomization
-
-We use an `R` package [SRS](https://github.com/atrihub/SRS) ("Subject Randomization System"), which we have modified to deal with the constraints of plate capacity, and keeping samples from the same subject together.
-
-(Note this is different than the `SRS` package on CRAN)
-
-```{r randomization}
+## ----randomization----------------------------------------------------------------------------------
 data(srs_data)
 # head(srs_data)
 
@@ -369,9 +184,9 @@ for(i in 1:nrow(srs_data)){
   r.obj <- randomize(r.obj, as.character(srs_data[i, "ID"]), 
      as.character(srs_data[i, expt@factor.names]))
 }
-```
 
-```{r, results='asis'}
+
+## ---- results='asis'--------------------------------------------------------------------------------
 tr.assignments <- r.obj@tr.assignments %>%
   mutate(
     Treatment = factor(Treatment, levels = r.obj@expt@treatment.names),
@@ -387,15 +202,9 @@ tr.assignments[1:10, ] %>%
   kable_styling(
     bootstrap_options=c('striped', 'condensed'),
     font_size=18, full_width=FALSE)
-```
 
----
 
-# Sample Randomization
-
-.pull-left[
-
-```{r}
+## ---------------------------------------------------------------------------------------------------
 tab <- with(tr.assignments, table(Plate, Age)) %>%
   as.data.frame() %>%
   pivot_wider(names_from='Age', values_from='Freq') %>%
@@ -407,49 +216,9 @@ tab %>%
   kable_styling(
     bootstrap_options=c('striped', 'condensed'),
     font_size=18, full_width=FALSE)
-```
 
-]
 
-.pull-right[
-
-- Number of young and old well balanced across the 13 plates
-- Number of samples per plate is also reasonable (plate capacity was set at 30 samples)
-
-]
-
----
-
-class: inverse, middle, center
-
-# Calibration
-
----
-
-# Calibration
-
-.large[
-
-- Calibration: developing a map from "raw" assay responses to concentrations (ng/ml) using samples of *known* concentrations
-- We will explore some approaches to calibration with methods from the `R` package `calibFit` `r Citep(bib=bib, c('calibFit', 'davidian1990'))`
-- The package includes some example data:
-  - High Performance Liquid Chromatography (HPLC) and 
-  - Enzyme Linked Immunosorbent Assay (ELISA)
-- These examples are taken straight from the package vignette
-
-]
-
-???
-
-The package is not actively maintained, so you must install the package from the CRAN archive
-
----
-
-# Calibration
-
-.pull-leftWider[
-
-```{r calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(2)}
+## ----calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(2)---------------------------------
 data(HPLC)
 data(ELISA)
 
@@ -478,23 +247,9 @@ p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response)) +
 	ggtitle("ELISA with 4 parameter logistic fit")
 
 grid.arrange(p1,p2,nrow=1)
-```
 
-]
 
-.pull-rightNarrower[
-
-- *Calibration* is *inverse regression* in which these fitted curves would be used to map assay responses from samples of unkown concentration (vertical axis) to concentration values (horizontal axis).
-- Both fits exhibit *heteroscedasticity*: the error variance is not constant with respect to Concentration
-- Most models assume *homoscedasticity*, or constant error variance.
-
-]
-
----
-
-# Residuals (Response - Fitted values)
-
-```{r calibFit_residuals, out.width='100%', fig.height=4, fig.width=4*(2)}
+## ----calibFit_residuals, out.width='100%', fig.height=4, fig.width=4*(2)----------------------------
 p1 <- ggplot(HPLC, aes(x=Concentration, y=Response-Fitted)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -510,71 +265,9 @@ p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response-Fitted)) +
 	ggtitle("ELISA with 4 parameter logistic fit")
 
 grid.arrange(p1,p2,nrow=1)
-```
 
----
 
-# Typical Regression
-
-Typically, regression models are of the form: 
-
-\begin{equation}
-Y_{i}=f(x_i,\beta)+\epsilon_{i}, 
-\end{equation}
-
-where:
-
-- $Y_{i}$ is the observed response/outcome for $i$th individual ( $i=1,\ldots,n$ ) 
-- $x_i$ are covariates/predictors for $i$th individual
-- $\beta$ are regression coefficients to be estimated
-- $f(\cdot,\cdot)$ is the model (assumed "known" or to be estimated)
-  - In linear regression $f(x_i,\beta)=x_i\beta$
-- $\epsilon_i$ is the residual error
-- We assume $\epsilon\sim\mathcal{N}(0,\sigma^2)$ 
-- $\sigma$ is the *constant* standard deviation (*homoscedastic*)
-
-If the standard deviation is not actually constant (*heteroscedastic*), estimates might be unreliable.
-
----
-
-# Modeling Heteroscedastic Errors
-
-The `calibFit` package includes models of the form: 
-
-\begin{equation}
-Y_{ij}=f(x_i,\beta)+\sigma g(\mu_i,z_i,\theta) \epsilon_{ij}, 
-\end{equation}
-
-where,
-
-- $Y_{ij}$ are observed assay values/responses for $i$th individual ( $i=1,\ldots,n$ ), $j$th replicate
-- $g(\mu_i,z_i,\theta)$ is a function that allows the variances to depend on:
-  - $\mu_i$ (the mean response $f(x_i,\beta)$), 
-  - covariates $z_i$, and 
-  - a parameter ("known" or unknown) $\theta$.
-- $\epsilon_{ij}\sim\mathcal{N}(0,1)$ 
-
-In particular, `calibFit` implements the Power of the Mean (POM) function
-
-\begin{equation}
-g(\mu_i,\theta) = \mu_i^{2\theta}
-\end{equation}
-
-which results in 
-
-\begin{equation}
-\operatorname{var}(Y_{ij}) = \sigma^2\mu_i^{2\theta}
-\end{equation}
-
-???
-
-allowing the variance can depend on the mean.
-
----
-
-# "Homogenized" Residuals From Fits with POM
-
-```{r, calib_fit}
+## ---- calib_fit-------------------------------------------------------------------------------------
 cal.fpl <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl"))
 cal.lin.pom <- with(HPLC, calib.fit(Concentration,Response,type="lin.pom"))
 cal.fpl.pom <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl.pom"))
@@ -590,9 +283,9 @@ theta.fpl <- cal.fpl.pom@theta
 
 linpom.res <- cal.lin.pom@residuals*(1/((linpom.fit^theta.lin)*sig.lin))
 fplpom.res <- cal.fpl.pom@residuals*(1/((fplpom.fit^theta.fpl)*sig.fpl))
-```
 
-```{r calibFit_pom_residuals, out.width='100%', fig.height=4, fig.width=4*(2)}
+
+## ----calibFit_pom_residuals, out.width='100%', fig.height=4, fig.width=4*(2)------------------------
 p1 <- ggplot(HPLC, aes(x=linpom.fit, y=linpom.res)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -608,13 +301,9 @@ p2 <- ggplot(ELISA, aes(x=fplpom.fit, y=fplpom.res)) +
 	ggtitle("ELISA with 4 parameter logistic POM")
 
 grid.arrange(p1,p2,nrow=1)
-```
 
----
 
-# HPLC Calibration With/Without POM Variance
-
-```{r calib_hplc_pom, fig.height=4.5, fig.width=4.5*2}
+## ----calib_hplc_pom, fig.height=4.5, fig.width=4.5*2------------------------------------------------
 par(mfrow=c(1,2))
 ciu <- fitted(linmodel) + summary(linmodel)$sigma*qt(.975,linmodel$df)
 cil <- fitted(linmodel) - summary(linmodel)$sigma*qt(.975,linmodel$df)
@@ -625,84 +314,28 @@ lines(HPLC$Concentration,ciu,col="lightblue",lty=2)
 lines(HPLC$Concentration,cil,col="grey",lty=2)
 
 plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentration", ylab = "Response")
-```
 
-???
 
-The mean does not change much, but we get more accurate 95% confidence bands
-
----
-
-# Elisa Calibration With/Without POM Variance
-
-```{r calib_elisa_pom, fig.height=4.5, fig.width=4.5*2}
+## ----calib_elisa_pom, fig.height=4.5, fig.width=4.5*2-----------------------------------------------
 par(mfrow=c(1,2))
 #par(mar = c(3.5,3.5,1.5,1.5))
 plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", ylab = "Response")
 
 #par(mar = c(3.5,3.5,1.5,1.5))
 plot(cal.fpl.pom,print=FALSE,main = "ELISA fit with POM",xlab = "Concentration", ylab = "Response")
-```
 
----
 
-# Calibrated Estimates for Each Sample
-
-.pull-left[
-
-```{r calibrated1, fig.height=4.5, fig.width=4.5, out.width='100%'}
+## ----calibrated1, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------
 calib.lin <- calib(cal.lin.pom, HPLC$Response)
 plot(calib.lin, main="HPLC calribated with linear POM")
-```
 
-]
 
-.pull-right[
-
-```{r calibrated2, fig.height=4.5, fig.width=4.5, out.width='100%'}
+## ----calibrated2, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------
 calib.fpl <- calib(cal.fpl.pom, ELISA$Response)
 plot(calib.fpl, main="ELISA calribated with FPL POM")
-```
 
-]
 
-???
-
-* MDC is Minimum Detectable Concentration, which we'll define on the next slide
-
----
-
-# Calibration Statistics
-
-Assuming calibration curve $f$, mapping concentrations to assay responses, is increasing, we define the following terms.
-
-**Minimum Detectable Concentration (MDC)**: The lowest concentration where the curve is increasing, or:
-
-  $$x_{\textrm{MDC}} = \min\{x : f(x, \beta) > \textrm{UCL}_0\}$$
-  
-  where $\textrm{UCL}_0$ is the upper confidence limit at 0
-
-**Reliable Detection Limit (RDL)**: The lowest concentration that has a high probability of producing a response that is significantly greater than the response at 0, or 
-  
-$$x_{\textrm{RDL}} = \min\{x : \textrm{LCL}_x > \textrm{UCL}_0 \}$$
-
-**Limit of Quantitization (LOQ)**: The lowest concentration at which the coefficient of variation is less than a fixed percent (default is 20% in the `calibFit` package).
-
----
-
-class: inverse, middle, center
-
-# Supervised Learning
-
-## Classification
-
----
-
-# Classification
-
-.pull-leftWider[
-
-```{r classification, fig.height=4, fig.width=6}
+## ----classification, fig.height=4, fig.width=6------------------------------------------------------
 dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
   arrange(RID, EXAMDATE) %>%
   filter(!duplicated(RID)) %>%
@@ -716,78 +349,21 @@ ggplot(dd, aes(x=ABETA, y=TAU)) +
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#E69F00", "#D55E00")) +
   theme(legend.position = c(0.80,0.75))
-```
 
-]
 
-.pull-rightNarrower[
-
-- Data from [adni.loni.usc.edu](adni.loni.usc.edu)
-- CSF Abeta 1-42 and t-tau assayed using the automated Roche Elecsys and cobas e 601 immunoassay analyzer system
-- Filter time points associated with first assay, and ignore subsequent time points
-- We'll ignore MCI and focus on CN vs Dementia
-- Values greater than the upper limit of detection have been assigned the limit
-
-]
-
----
-
-# Classification
-
-```{r classification_no_mci}
+## ----classification_no_mci--------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00"))
-```
 
----
 
-# Reciever Operatoring Characteristic (ROC) Curves
-
-.pull-left[
-
-```{r ROC_abeta, fig.width=5, fig.height=5}
+## ----ROC_abeta, fig.width=5, fig.height=5-----------------------------------------------------------
 roc_abeta <- roc((DX=='Dementia') ~ ABETA, subset(dd, DX!='MCI'))
 # ggroc(roc_abeta)
 plot(roc_abeta, print.thres="best", print.thres.best.method="youden")
-```
 
-]
 
-.pull-right[
-
-For each potential threshold applied to CSF $\textrm{A}\beta 42$, 
-we calculate:
-- Sensitivity: True Positive Rate = TP/(TP+FN)
-- Specificity: True Negative Rate = TN/(TN+FP)
-
-This traces out the ROC curve.
-
-A typical summary of a classifier's performance is the
-Area Under the Curve (AUC)
-
-AUC=`r roc_abeta$auc` in this case, with 95% CI ( `r ci(roc_abeta)[c(1,3)]` )
-
-AUCs close to one indicate good performance.
-
-The threshold shown here maximizes the distance between the curve
-and the diagonal line (chance) `r Citep(bib=bib, 'Youden')`
-
-]
-
-???
-
-Sensitivity is a measure of how well we are detecting positive cases
-
-Specificity is a measure of how well we are detecting controls or negative cases
-
----
-
-# Comparing ROC Curves
-
-.pull-left[
-
-```{r ROC_abeta_tau, fig.width=5, fig.height=5}
+## ----ROC_abeta_tau, fig.width=5, fig.height=5-------------------------------------------------------
 roc_tau <- roc((DX=='Dementia') ~ TAU, subset(dd, DX!='MCI'))
 roc_tauabeta <- roc((DX=='Dementia') ~ I(TAU/ABETA), subset(dd, DX!='MCI'))
 
@@ -799,51 +375,21 @@ legend("bottomright",
   legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta))),
        col=c("blue", "orange", "red"), lwd=2)
 
-```
-
-]
-
-.pull-right[
 
 
-| Marker                 | AUC                  | 95% CI                       | P-value $^*$ |
-| ---------------------- |:--------------------:| ----------------------------:| ------------:|
-| $\textrm{A}\beta$      | `r roc_abeta$auc`    | `r ci(roc_abeta)[c(1,3)]`    |              |
-| Tau                    | `r roc_tau$auc`      | `r ci(roc_tau)[c(1,3)]`      |  0.07        |
-| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc` | `r ci(roc_tauabeta)[c(1,3)]` |  <0.001      |
-$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
-
-So the ratio of Tau / $\textrm{A}\beta$ shows the best discrimination of NC from Dementia cases.
-
-```{r, echo=FALSE, eval=FALSE}
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
 roc.test(roc_abeta, roc_tau)
 roc.test(roc_abeta, roc_tauabeta)
-```
 
-]
 
----
-
-# Youden's Cutoff for Tau / $\textrm{A}\beta$ Ratio
-
-```{r abeta_tau_scatter_youden, fig.height=2.5, fig.width=3*2}
+## ----abeta_tau_scatter_youden, fig.height=2.5, fig.width=3*2----------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
   geom_abline(intercept = 0, slope=0.394)
-```
 
-Line is Tau = 0.394 $\times$ Abeta, depicting Youden's cutoff (maximizes sensitivity + specificity - 1)
 
-???
-
-Youden's cutoff maximizing sensitivity + specificity - 1 is appropriate if sensitivity and specificity are equally important
-
----
-
-# Logistic Regression
-
-```{r}
+## ---------------------------------------------------------------------------------------------------
 logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), 
   data = subset(dd, DX!='MCI'), family=binomial)
 summary(logistic.fit)$coef %>%
@@ -851,28 +397,17 @@ summary(logistic.fit)$coef %>%
   rownames_to_column(var='Coefficient') %>%
   mutate(`Pr(>|z|)` = format.pval(round(`Pr(>|z|)`, digits = 3), eps = 0.001, digits=3)) %>%
   kable()
-```
 
-$$\log\big(\frac{p}{1-p}\big) = \hat\gamma_0 + A\beta_z \hat\gamma_{A\beta} + \textrm{tau}_z \hat\gamma_{\textrm{tau}}$$
-where $\hat\gamma$ are regression coefficients.
 
----
-
-# Logistic Regression Predicted Probabilities
-
-```{r logistic_pred_prob}
+## ----logistic_pred_prob-----------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=predict(logistic.fit, type='response'))) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
   labs(color="Pred. prob. of Dementia") +
   geom_abline(intercept = 0, slope=0.394)
-```
 
----
 
-# Ratio Contours
-
-```{r ratio_gradient}
+## ----ratio_gradient---------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=TAU/ABETA)) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
@@ -886,20 +421,9 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   geom_line(data=data.frame(ABETA=80:1700, TAU=1/4*(80:1700)), aes(color=TAU/ABETA)) +
   geom_line(data=data.frame(ABETA=80:1700, TAU=1/5*(80:1700)), aes(color=TAU/ABETA)) +
   coord_cartesian(xlim=c(200,1700), ylim=c(80,852))
-```
-
-???
-
-by using ratio's we're simplifying the bivariate scatter by assuming all dots along
-these lines intersecting (0,0) are equivalent
-
-dashed line has slope 1
----
 
 
-# Logistic Regression Predicted Probability Contours
-
-```{r ratio_gradient_logistic}
+## ----ratio_gradient_logistic------------------------------------------------------------------------
 tau_fun <- function(abeta, p){
   # log(p/(1-p)) = y = a + b*abetaz + c*tauz
   # tauz = (y - a - b*abetaz)/c
@@ -925,22 +449,9 @@ ggplot(pd, aes(x=ABETA, y=TAU, color=prob)) +
   geom_line(data=data.frame(ABETA=80:1700, TAU=tau_fun(80:1700, p=0.9), prob=0.9)) +
   geom_line(data=data.frame(ABETA=80:1700, TAU=tau_fun(80:1700, p=0.99), prob=0.99)) +
   coord_cartesian(xlim=c(200,1700), ylim=c(80,852))
-```
 
-???
 
-in contrast, logistic regression assumes the predicted probability gradient follows these
-parallel lines
-
-lines now are where predicted probabilities from logistic regression are constant
-
----
-
-# Comparing ROC Curves
-
-.pull-left[
-
-```{r ROC_logistic, fig.width=5, fig.height=5}
+## ----ROC_logistic, fig.width=5, fig.height=5--------------------------------------------------------
 roc_logistic.fit <- roc((DX=='Dementia') ~ predict(logistic.fit, type='response'), subset(dd, DX!='MCI'))
 
 plot(roc_abeta, col='blue')
@@ -951,72 +462,35 @@ legend("bottomright",
   legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta)), 'Logistic model'),
        col=c("blue", "orange", "red", "purple"), lwd=2)
 
-```
-
-]
-
-.pull-right[
 
 
-| Marker                 | AUC                      | 95% CI                           | P-value $^*$ |
-| ---------------------- |:------------------------:| --------------------------------:| ------------:|
-| $\textrm{A}\beta$      | `r roc_abeta$auc`        | `r ci(roc_abeta)[c(1,3)]`        |              |
-| Tau                    | `r roc_tau$auc`          | `r ci(roc_tau)[c(1,3)]`          |  0.07        |
-| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc`     | `r ci(roc_tauabeta)[c(1,3)]`     |  <0.001      |
-| Logisitic model        | `r roc_logistic.fit$auc` | `r ci(roc_logistic.fit)[c(1,3)]` |  <0.001      |
-$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
-
-Logistic model ROC is very similar to Tau/ $\textrm{A}\beta$ ratio ROC.
-
-```{r, echo=FALSE, eval=FALSE}
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
 roc.test(roc_abeta, roc_logistic.fit)
-```
 
-]
 
----
-
-# Logistic Regression with Age and APOE
-
-```{r}
+## ---------------------------------------------------------------------------------------------------
 logistic.fit2 <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU) + scale(I(AGE+Years.bl)) + as.factor(APOE4), family=binomial, data = subset(dd, DX!='MCI'))
 summary(logistic.fit2)$coef %>% 
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
   mutate(`Pr(>|z|)` = format.pval(round(`Pr(>|z|)`, digits = 3), eps = 0.001, digits=3)) %>%
   kable()
-```
 
-```{r, eval=FALSE}
+
+## ---- eval=FALSE------------------------------------------------------------------------------------
 roc_logistic.fit2 <- roc((DX=='Dementia') ~ predict(logistic.fit2, type='response'), subset(dd, DX!='MCI'))
 roc.test(roc_abeta, roc_logistic.fit2)
 roc.test(roc_tauabeta, roc_logistic.fit2)
 auc(roc_logistic.fit2); ci(roc_logistic.fit2)
-```
 
-This model does not provide much better ROC, either.
 
----
-
-# Regression Trees
-
-```{r tree1, fig.height=4.5, fig.width=5*(2)}
+## ----tree1, fig.height=4.5, fig.width=5*(2)---------------------------------------------------------
 tree.fit <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'), 
   controls = ctree_control(maxdepth=2))
 plot(tree.fit)
-```
 
-`r Citet(bib=bib, 'ctree')`
 
-???
-
-Regression trees use recursive partitioning to classify data into more and more homogeneous subgroups
-
----
-
-# Tree-based Methods
-
-```{r tree2}
+## ----tree2------------------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
@@ -1025,19 +499,9 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   #geom_hline(yintercept = 440) +
   geom_segment(aes(x = 0, y = 210, xend = 886, yend = 210)) +
   geom_segment(aes(x = 886, y = 440, xend = 1700, yend = 440))
-```
 
-???
 
-With this shallow tree, we end up with these four partitions of the Abeta-by-Tau scatter
-
----
-
-# Comparing ROC Curves
-
-.pull-left[
-
-```{r ROC_rf, fig.width=5, fig.height=5}
+## ----ROC_rf, fig.width=5, fig.height=5--------------------------------------------------------------
 tree.fit2 <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 rf.fit <- cforest((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 roc_tree.fit <- roc((DX=='Dementia') ~ predict(tree.fit2, type='response')[,1], subset(dd, DX!='MCI'))
@@ -1053,72 +517,21 @@ legend("bottomright",
   legend=c(expression(paste("A", beta)), "Tau", expression(paste("Tau/A", beta)), 
       'Logistic model', 'Binary Tree', 'Random Forest'),
     col=c("blue", "orange", "red", "purple", "grey", "black"), lwd=2)
-```
-
-]
-
-.pull-right[
 
 
-| Marker                 | AUC                      | 95% CI                           | P-value $^*$ |
-| ---------------------- |:------------------------:| --------------------------------:| ------------:|
-| $\textrm{A}\beta$      | `r roc_abeta$auc`        | `r ci(roc_abeta)[c(1,3)]`        |              |
-| Tau                    | `r roc_tau$auc`          | `r ci(roc_tau)[c(1,3)]`          |  0.07        |
-| Tau/ $\textrm{A}\beta$ | `r roc_tauabeta$auc`     | `r ci(roc_tauabeta)[c(1,3)]`     |  <0.001      |
-| Logisitic model        | `r roc_logistic.fit$auc` | `r ci(roc_logistic.fit)[c(1,3)]` |  <0.001      |
-| Binary Tree            | `r roc_tree.fit$auc`     | `r ci(roc_tree.fit)[c(1,3)]`     |  <0.001      |
-| Random Forest          | `r roc_rf.fit$auc`       | `r ci(roc_rf.fit)[c(1,3)]`       |  <0.001      |
-$^*$ Bootstrap test comparing each row to $\textrm{A}\beta$ `r Citep(bib=bib, 'pROC')`
-
-Random Forests `r Citep(bib=bib, c('breiman2001', 'hothorn2006'))` re-fit binary trees on random subsamples
-of the data, then aggregate resulting trees into a "forest". This results in smoother predictions and a smoother ROC curve.
-
-```{r, echo=FALSE, eval=FALSE}
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
 roc.test(roc_abeta, roc_tree.fit)
 roc.test(roc_abeta, roc_rf.fit)
-```
 
-]
 
----
-
-class: inverse, middle, center
-
-# Unsupervised Learning
-
-## Mixture Modeling
-
----
-
-# Unsupervised Learning
-
-.large[
-- The classification techniques we just reviewed can be thought of as *Supervised Learning* in which we attempt to learn known "labels" (CN, Dementia).
-- *Mixture Modeling* is type of *Unsupervised Learning* technique in which we try to identify clusters of populations which appear to be arising from different distributions
-- Don't confuse *Mixture Models* with *Mixed-Effects Models* (which we'll discuss later)
-  - Think: "Mixture of Distributions"
-]
-
----
-
-# Distribution of ABETA
-
-```{r density_Abeta, fig.height=2.25, fig.width=3*(2)}
+## ----density_Abeta, fig.height=2.25, fig.width=3*(2)------------------------------------------------
 ggplot(subset(dd, DX!='MCI' & ABETA<1700), aes(x=ABETA)) + 
   geom_histogram(aes(y=..density..), alpha=0.5) +
   geom_density() +
   geom_rug(aes(color=DX))
-```
 
-- Distribution is bimodal
-- Can we identify the two sub-distributions?
-- We'll explore with `mixtools` package `r Citep(bib, 'mixtools')`
 
----
-
-# Distribution of ABETA
-
-```{r, results='hide', cache=TRUE}
+## ---- results='hide', cache=TRUE--------------------------------------------------------------------
 #' Plot a Mixture Component
 #' 
 #' @param x Input data
@@ -1136,9 +549,9 @@ mixmdl <- normalmixEM(subset(dd, DX!='MCI' & ABETA<1700)$ABETA, k = 2)
 set.seed(1)
 mvmixmdl <- mvnormalmixEM(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], k = 2)
 ## number of iterations= 85
-```
 
-```{r mixture_distribution_Abeta}
+
+## ----mixture_distribution_Abeta---------------------------------------------------------------------
 data.frame(ABETA = mixmdl$x) %>%
   ggplot(aes(x=ABETA)) +
   geom_histogram(aes(y=..density..), alpha=0.5) +
@@ -1149,17 +562,9 @@ data.frame(ABETA = mixmdl$x) %>%
                 args = list(mixmdl$mu[2], mixmdl$sigma[2], lam = mixmdl$lambda[2]),
                 colour = "#0072B2", lwd = 1.5) +
   ylab("Density")
-```
 
-???
 
-mixture models provide latent class membership probabilities, such as these 
-
----
-
-# Posterior Membership Probabilities
-
-```{r}
+## ---------------------------------------------------------------------------------------------------
 post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>%
   arrange(x) %>% 
   rename(Abeta = x, `Prob. Abnormal` = comp.1, `Prob. Normal` = comp.2)
@@ -1167,13 +572,9 @@ post.df %>% filter(Abeta > 1030 & Abeta < 1080) %>% kable()
 
 # A reasonable cutoff might be:
 # filter(post.df, `Prob. Abnormal` <= `Prob. Normal`)[1,]
-```
 
----
 
-## Bivariate Density
-
-```{r Bivariate_Density}
+## ----Bivariate_Density------------------------------------------------------------------------------
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
   showlegend = FALSE,
@@ -1185,15 +586,9 @@ fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
     ))
 
 htmlwidgets::saveWidget(fig, "bvdensity_csf_tau.html")
-```
 
-<iframe src="bvdensity_csf_tau.html" width="100%" height="500" id="igraph" scrolling="no" seamless="seamless" frameBorder="0"> </iframe>
 
----
-
-# Bivariate Density Contour Plot
-
-```{r bv_kernel_density}
+## ----bv_kernel_density------------------------------------------------------------------------------
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 kdl <- expand.grid(i=1:50, j=1:50) %>%
   mutate(Abeta=NA, Tau=NA, density=NA)
@@ -1206,14 +601,9 @@ for(r in 1:nrow(kdl)){
 ggplot(kdl, aes(Abeta, Tau, z = density)) +
   geom_raster(aes(fill=density))+
   geom_contour(color='white')
-```
 
----
 
-# Bivariate Mixture Model Posterior Probabilities
-
-.pull-left[
-```{r mvmix_post_prob, fig.width=5, fig.height=5, out.width='100%'}
+## ----mvmix_post_prob, fig.width=5, fig.height=5, out.width='100%'-----------------------------------
 post.df2 <- cbind(mvmixmdl$x, mvmixmdl$posterior) %>% 
   as.data.frame() %>% 
   rename(
@@ -1226,37 +616,14 @@ ggplot(post.df2, aes(x=ABETA, y=TAU, color=`Prob. Abnormal`)) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
   geom_abline(intercept = 0, slope=0.394) +
   theme(legend.position=c(0.85, 0.82))
-```
-]
-.pull-right[
-```{r mvmix_density, fig.width=5, fig.height=5, out.width='100%'}
+
+
+## ----mvmix_density, fig.width=5, fig.height=5, out.width='100%'-------------------------------------
 plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10), 
   marginal = FALSE, whichplots=3, main2='', 
   xlab2='ABETA', ylab2='TAU')
-```
-]
 
----
 
-# Summary
-
-.large[
-- Batch Effects
-- Experimental Design (Sample Randomization)
-- Statistical Models for Assay Calibration/Quantification
-- Classification (Supervised Learning)
-  - Logistic Regression
-  - Binary Trees
-  - Random Forest
-- Mixture Modeling (Unsupervised Learning)
-  - Univariate
-  - Bivariate
-]
-
----
-
-# References
-
-```{r refs, echo=FALSE, results="asis"}
+## ----refs, echo=FALSE, results="asis"---------------------------------------------------------------
 PrintBibliography(bib)
-```
+
