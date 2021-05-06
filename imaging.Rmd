@@ -38,7 +38,6 @@ library(knitr)
 library(tidyverse)
 library(kableExtra)
 library(gridExtra)
-library(RefManageR)
 library(plotly)
 
 options(digits=2)
@@ -83,14 +82,17 @@ knitr::opts_chunk$set(
 ```
 
 
-```{r, load_refs, include=FALSE, cache=FALSE, purl=FALSE}
+```{r load_refs, include=FALSE, cache=FALSE, purl=FALSE}
+library(RefManageR)
 BibOptions(check.entries = FALSE,
-           bib.style = "authoryear",
-           cite.style = "authoryear",
-           style = "markdown",
-           hyperlink = FALSE,
-           dashed = FALSE)
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 1)
 bib <- ReadBib("./references.bib", check = FALSE)
+NoCite(bib, c('properzi2019nonlinear', 'rowe201718', 'klunk2015centiloid', 'navitsky2018standardization', 'li2019bayesian'))
 # Citet(), Citep(), AutoCite()
 ```
 
@@ -175,7 +177,7 @@ summary(lm_fit1_gender)$coef %>%
 ```
 
 - Signficant association between Gender and Hippocampal Volume (%ICV)!
-- (This is linear model is essential just a two-sample t-test)
+- (This linear model is essential just a two-sample t-test)
 - Model fit to ADNI CN
 
 ---
@@ -215,7 +217,7 @@ ggplot(dd2, aes(y=Hippocampus, x=ICV, color=PTGENDER)) +
 .pull-rightNarrower[
 
 - For a given ICV, there is not much difference between genders
-- Theses linear fits are more flexible than model above (two slopes for ICV vs one)
+- These linear fits are more flexible than model above (two slopes for ICV vs one)
 
 ]
 
@@ -291,20 +293,390 @@ class: inverse, middle, center
 
 # Centiloids
 
+- Centiloids have become the industry standard standardized measure of amyloid PET `r Citep(bib=bib, 'klunk2015centiloid')`
+- Helpful in multi-site studies where different amyloid PET tracers might be utilized.
+- What is a centiloid?
+
+---
+
+# What is a centiloid? Step 1: PiB SUVr to CL
+
+- The original/base PiB SUVr to centiloid map:
+ - 1.009 PiB SUVr (mean in young controls) $\rightarrow$ 0 CL
+ - 2.076 PiB SUVr (mean in AD cases) $\rightarrow$ 100 CL
+ - For other PiB SUVr values, draw the line from (1.009, 0) to (2.076, 100)
+
+---
+
+# What is a centiloid? Step 1: PiB SUVr to CL
+
+```{r}
+ggplot() + 
+  geom_segment(aes(x=1.009, y=0, xend=2.076, yend=100),
+    arrow = arrow(length = unit(0.03, "npc"), ends='both')) +
+  geom_abline(slope = 100/(2.076-1.009), 
+    intercept=-1.009*100/(2.076-1.009), linetype='dashed') +
+  geom_point(aes(x=1.009, y=0)) +
+  geom_point(aes(x=2.076, y=100)) +
+  xlab('PiB SUVr') + ylab('Centiloid') +
+  xlim(1, 3) + ylim(-5, 200)
+   
+```
+
+---
+
+# What is a centiloid? Step 2: Other SUVr to PiB SUVr
+
+- Step 2 requires *paired* data: each individuals scanned with PiB and the other tracer
+- Linear regression (ordinary least squares) is used to create linear transformation
+- Transformed data is then mapped to CL using map on prior slide
+
+---
+
+# What is a centiloid? Step 2: Other SUVr to PiB SUVr
+
+```{r echo=FALSE, fig.align='center', out.width='75%', purl=FALSE}
+knitr::include_graphics("./images/rowe2017.png")
+```
+
+$\textrm{SUVR}_{\textrm{FBB}} = 0.61 \times  \textrm{SUVR}_{\textrm{PiB}} + 0.39$
+
+`r Citet(bib=bib, 'rowe201718')`
+
+---
+
+# Distribution mapping
+
+```{r echo=FALSE, fig.align='center', out.width='75%', purl=FALSE}
+knitr::include_graphics("./images/properzi2019.png")
+```
+
+`r Citet(bib=bib, 'properzi2019nonlinear')`
+
+???
+
+Another approach is normalizing data from different tracers (or fluid assays for that matter) is map distributions.
+
+If we only have unpaired data from similar populations, we can map one to other under the assumption that their distributions should have similar shape.
+
+---
+
+# Emprical Cumulative Distribution Function (ECDF)
+
+```{r echo=FALSE}
+pibids <- unique(subset(ADNIMERGE::adnimerge, !is.na(PIB))$RID)
+av45ids <- unique(subset(ADNIMERGE::adnimerge, !is.na(AV45))$RID)
+set.seed(20210506)
+holdout <- sample(intersect(pibids, av45ids), size = 10)
+
+dd <- ADNIMERGE::adnimerge %>%
+  filter(!RID %in% holdout) %>%
+  arrange(RID, EXAMDATE) %>%
+  select(RID, DX, PIB, AV45) %>%
+  rename(PiB = PIB, Florbetapir = AV45) %>%
+  mutate(PiB = as.numeric(PiB), Florbetapir = as.numeric(Florbetapir)) %>%
+  group_by(RID) %>%
+  fill(DX, .direction = "downup") %>%
+  filter(!is.na(PiB) | !is.na(Florbetapir)) %>%
+  filter(!duplicated(RID)) %>%
+  pivot_longer(cols=c('PiB', 'Florbetapir'), names_to='Tracer', values_to='SUVR') %>%
+  mutate(Tracer = factor(Tracer, levels = c('PiB', 'Florbetapir'))) %>%
+  filter(!is.na(SUVR))
+  
+ggplot(dd, aes(x=SUVR)) +
+  stat_ecdf(geom = "step") +
+  facet_grid(.~Tracer, scales='free_x')
+```
+
+???
+
+CDFs are useful one-to-one maps
+
+Underly random number generators. A random number from a uniform 0-1 distribution can be mapped to any other distribution by the inverse CDF.
+
+In this case we can map PiB SUVRs to florbetapir SUVRs or vice versa
+
+But it only works if samples are similar, and we believe both tracers would sort the samples similarly.
+
+---
+
+# Weighted ECDFs to correct for sampling differences
+
+N (%) per diagnosis and tracer:
+
+```{r, echo=FALSE}
+t1 <- with(dd, table(DX, Tracer))
+t2 <- round(with(dd, prop.table(table(DX, Tracer), margin = 2))*100, 1)
+tt <- t1
+tt[,1] <- paste(t1[,1], paste0("(", t2[,1], "%)"))
+tt[,2] <- paste(t1[,2], paste0("(", t2[,2], "%)"))
+kable(tt)
+```
+
+Inverse proportion weights:
+
+```{r}
+invproptab <- 1/with(dd, prop.table(table(DX, Tracer), margin = 2))
+kable(invproptab)
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+```{r, echo=TRUE}
+# Record the sampling adjustment weights in the data
+dd <- dd %>% mutate(
+  wt = case_when(
+    DX == 'CN' & Tracer == 'PiB' ~ invproptab['CN', 'PiB'],
+    DX == 'MCI' & Tracer == 'PiB' ~ invproptab['MCI', 'PiB'],
+    DX == 'Dementia' & Tracer == 'PiB' ~ invproptab['Dementia', 'PiB'],
+    DX == 'CN' & Tracer == 'Florbetapir' ~ invproptab['CN', 'Florbetapir'],
+    DX == 'MCI' & Tracer == 'Florbetapir' ~ invproptab['MCI', 'Florbetapir'],
+    DX == 'Dementia' & Tracer == 'Florbetapir' ~ invproptab['Dementia', 'Florbetapir']
+  ))
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+```{r, echo=TRUE}
+# Create adjusted ECDF functions (mapping SUVRs to Cumulative Probabilities)
+PiB.ecdf.data <- with(subset(dd, Tracer == 'PiB'), 
+  Hmisc::wtd.Ecdf(SUVR, weights=wt, normwt=TRUE))
+Fbp.ecdf.data <- with(subset(dd, Tracer == 'Florbetapir'), 
+  Hmisc::wtd.Ecdf(SUVR, weights=wt, normwt=TRUE))
+
+PiB.ecdf <- with(PiB.ecdf.data, approxfun(x, ecdf, rule=2))
+Fbp.ecdf <- with(Fbp.ecdf.data, approxfun(x, ecdf, rule=2))
+
+# Create adjusted inverse ECDF functions (mapping Cumulative Probabilities to SUVRs)
+Probs <- seq(0,1,by=0.01)
+PiB.inv.ecdf.data <- as.numeric(with(subset(dd, Tracer == 'PiB'), 
+  Hmisc::wtd.quantile(SUVR, weights=wt, normwt=TRUE, probs=Probs)))
+Fbp.inv.ecdf.data <- as.numeric(with(subset(dd, Tracer == 'Florbetapir'), 
+  Hmisc::wtd.quantile(SUVR, weights=wt, normwt=TRUE, probs=Probs)))
+
+PiB.inv.ecdf <- approxfun(Probs, PiB.inv.ecdf.data, rule=2)
+Fbp.inv.ecdf <- approxfun(Probs, Fbp.inv.ecdf.data, rule=2)
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+```{r, echo=TRUE}
+dd <- dd %>% mutate(
+  `Adjusted cumulative probability` = case_when( # 
+    Tracer == 'PiB' ~ PiB.ecdf(SUVR),
+    Tracer == 'Florbetapir' ~ Fbp.ecdf(SUVR)),
+  `Adjusted Z-score` = qnorm(`Adjusted cumulative probability`), # adjusted z-scores
+  `Florbetapir to PiB adjusted SUVR` = case_when(
+    Tracer == 'Florbetapir' ~ PiB.inv.ecdf(Fbp.ecdf(SUVR))),
+  `PiB to Florbetapir adjusted SUVR` = case_when(
+    Tracer == 'PiB' ~ Fbp.inv.ecdf(PiB.ecdf(SUVR)))
+  ) %>%
+  arrange(Tracer, SUVR)
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+```{r weighted-ecdfs}
+ggplot(dd, aes(x=SUVR)) +
+  stat_ecdf(geom = "step") +
+  facet_grid(.~Tracer, scales='free_x') +
+  geom_line(aes(x=SUVR, y=`Adjusted cumulative probability`), linetype='dashed') +
+  ylab('Cumulative Probability')
+```
+
+---
+
+# Densities for estimated and actual PiB SUVRs
+
+```{r pib-densities}
+dd %>% select(RID, DX, Tracer, SUVR, `Florbetapir to PiB adjusted SUVR`) %>%
+  pivot_longer(c('SUVR', 'Florbetapir to PiB adjusted SUVR'), 
+    names_to = 'Source', values_to = 'SUVR') %>%
+  filter( (Tracer == 'PiB' & Source == 'SUVR') |
+      (Tracer == 'Florbetapir' & Source == 'Florbetapir to PiB adjusted SUVR')) %>%
+  mutate( Source = ifelse(Source == 'SUVR', 'Directly observed PiB SUVR', 'ECDF mapped Florbetapir to PiB SUVR')) %>%
+ggplot(aes(x=SUVR, color=Source)) +
+  geom_rug(alpha=0.01) +
+  geom_density()
+```
+
+???
+
+Not perfectly matched due to different sample characteristics. To be expected.
+
+Recall PiB had less representation of CU and Florbetapir had more with dementia
+
+---
+
+# Densities by diagnosis
+
+```{r pib-densities-dx}
+dd %>% select(RID, DX, Tracer, SUVR, `Florbetapir to PiB adjusted SUVR`) %>%
+  pivot_longer(c('SUVR', 'Florbetapir to PiB adjusted SUVR'), 
+    names_to = 'Source', values_to = 'SUVR') %>%
+  filter( (Tracer == 'PiB' & Source == 'SUVR') |
+      (Tracer == 'Florbetapir' & Source == 'Florbetapir to PiB adjusted SUVR')) %>%
+  mutate( Source = ifelse(Source == 'SUVR', 'Directly observed PiB SUVR', 'ECDF mapped Florbetapir to PiB SUVR')) %>%
+  filter(!is.na(DX)) %>%
+ggplot(aes(x=SUVR, color=Source)) +
+  geom_rug(alpha=0.25) +
+  geom_density() +
+  facet_grid(.~DX)
+```
+
+???
+
+Not perfectly matched due to different sample characteristics. To be expected.
+
+Recall PiB had less representation of CU and Florbetapir had more with dementia
+
+---
+
+# Densities for weighted ECDF derived z-scores
+
+```{r z-score-densities}
+ggplot() +
+  geom_rug(data = subset(dd, Tracer == 'Florbetapir'), aes(x=`Adjusted Z-score`, color = Tracer)) +
+  geom_rug(data = subset(dd, Tracer == 'PiB'), aes(x=`Adjusted Z-score`, color = Tracer)) +
+  geom_density(data = subset(dd, Tracer == 'Florbetapir'), aes(x=`Adjusted Z-score`, color = Tracer)) +
+  geom_density(data = subset(dd, Tracer == 'PiB'), aes(x=`Adjusted Z-score`, color = Tracer))
+```
+
+Useful for analysis, as in `r Citet(bib, 'li2019bayesian')`
+
+???
+
+Useful for analysis
+
+---
+
+# Using the ECDF derived z-scores for analysis
+
+.pull-left[
+
+```{r echo=FALSE, fig.align='center', out.width='95%', purl=FALSE}
+knitr::include_graphics("./images/li2019.png")
+```
+
+]
+
+.pull-right[
+
+* ECDF derived z-scores were used in model (assuming Gaussian residuals)
+* Posterior estimates (on z-score scale) then back transformed to cumulative probabilities
+* Natural interpretation:
+  * 0 (most healthy) to 1 (most severe) 
+  * Comparable across different measures
+
+`r Citep(bib, 'li2019bayesian')`
+
+]
+
+---
+
+# Validation on a holdout set with PiB and Florbetapir scans
+
+```{r}
+dd.validate <- full_join(
+  ADNIMERGE::adnimerge %>% 
+    arrange(RID, EXAMDATE) %>% 
+    select(RID, EXAMDATE, PIB) %>%
+    rename(PiB = PIB) %>%
+    filter(RID %in% holdout) %>%
+    filter(!is.na(PiB)) %>%
+    filter(!duplicated(RID)),
+  ADNIMERGE::adnimerge %>% 
+    arrange(RID, EXAMDATE) %>% 
+    select(RID, EXAMDATE, AV45) %>%
+    rename(Florbetapir = AV45) %>%
+    filter(RID %in% holdout) %>%
+    filter(!is.na(Florbetapir)) %>%
+    filter(!duplicated(RID)), by='RID', suffix = c('.PiB', '.Fbp')
+  ) %>%
+  mutate(
+    `Years between scans` = as.numeric(EXAMDATE.Fbp - EXAMDATE.PiB)/365.25,
+    `Navitsky et al linear map of PiB to Florbetapir` = 
+      as.numeric(0.536 * PiB + 0.502),
+    `Navitsky et al linear map of Florbetapir to PiB` = 
+      as.numeric((Florbetapir - 0.502)/0.536),
+    `ECDF map of Florbetapir to PiB` = PiB.inv.ecdf(Fbp.ecdf(Florbetapir)),
+    `ECDF map of PiB to Florbetapir` = Fbp.inv.ecdf(PiB.ecdf(PiB))
+  )
+
+dd.validate %>%
+  select(RID, `Years between scans`, PiB, 
+    `Navitsky et al linear map of Florbetapir to PiB`,
+    `ECDF map of Florbetapir to PiB`) %>%
+  rename(
+    `Navitsky et al linear map*` = `Navitsky et al linear map of Florbetapir to PiB`,
+    `ECDF map` = `ECDF map of Florbetapir to PiB`) %>%
+  pivot_longer(c('Navitsky et al linear map*', 'ECDF map'), 
+    names_to = 'Method', values_to = 'Estimated PiB SUVR') %>%
+ggplot(aes(x=PiB, y=`Estimated PiB SUVR`)) +
+  geom_point(aes(color=`Years between scans`)) +
+  geom_abline(intercept = 0, slope=1) +
+  facet_grid(.~Method) +
+  xlab('Actual PiB SUVR')
+```
+
+$^*$ Using PiB = (Florbetapir - 0.502)/0.536 from `r Citet(bib=bib, 'navitsky2018standardization')`
+
+---
+
+# Validation on a holdout set with PiB and Florbetapir scans
+
+```{r}
+dd.validate %>%
+  select(RID, `Years between scans`, Florbetapir, 
+    `Navitsky et al linear map of PiB to Florbetapir`,
+    `ECDF map of PiB to Florbetapir`) %>%
+  rename(
+    `Navitsky et al linear map*` = `Navitsky et al linear map of PiB to Florbetapir`,
+    `ECDF map` = `ECDF map of PiB to Florbetapir`) %>%
+  pivot_longer(c('Navitsky et al linear map*', 'ECDF map'), 
+    names_to = 'Method', values_to = 'Estimated Florbetapir SUVR') %>%
+ggplot(aes(x=Florbetapir, y=`Estimated Florbetapir SUVR`)) +
+  geom_point(aes(color=`Years between scans`)) +
+  geom_abline(intercept = 0, slope=1) +
+  facet_grid(.~Method) +
+  xlab('Actual Florbetapir SUVR')
+```
+
+$^*$ Using Florbetapir = PiB $\times$ 0.536 + 0.502 from `r Citet(bib=bib, 'navitsky2018standardization')`
+
+???
+
+This type of approach could also be useful for standardizing fluid assays
+
 ---
 
 class: inverse, middle, center
 
-# Machine Learning
+# Longitudinal Data
 
 ---
 
-# Machine Learning
+# Longitudinal Data
 
 ---
 
 # References
 
-```{r refs, echo=FALSE, results="asis"}
+```{r refs, echo=FALSE, results="asis", purltt=FALSE}
+BibOptions(check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 10)
 PrintBibliography(bib)
 ```

@@ -40,7 +40,6 @@ library(knitr)
 library(tidyverse)
 library(kableExtra)
 library(gridExtra)
-library(RefManageR)
 library(plotly)
 library(calibFit)
 library(SRS)
@@ -89,14 +88,17 @@ knitr::opts_chunk$set(
 # purl('fluid.Rmd')
 ```
 
-```{r, load_refs, include=FALSE, cache=FALSE, purl=FALSE}
+```{r load_refs, include=FALSE, cache=FALSE, purl=FALSE}
+library(RefManageR)
 BibOptions(check.entries = FALSE,
-           bib.style = "authoryear",
-           cite.style = "authoryear",
-           style = "markdown",
-           hyperlink = FALSE,
-           dashed = FALSE)
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 1)
 bib <- ReadBib("./references.bib", check = FALSE)
+NoCite(bib, c('calibFit', 'davidian1990', 'Youden', 'pROC', 'ctree', 'breiman2001', 'hothorn2006', 'mixtools'))
 # Citet(), Citep(), AutoCite()
 ```
 
@@ -1257,6 +1259,13 @@ plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10),
 
 # References
 
-```{r refs, echo=FALSE, results="asis"}
+```{r refs, echo=FALSE, results="asis", purl = FALSE}
+BibOptions(check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 10)
 PrintBibliography(bib)
 ```
