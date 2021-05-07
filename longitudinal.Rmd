@@ -1,0 +1,1396 @@
+---
+title: Biostatistics for Longitudinal Data
+output: 
+  xaringan::moon_reader:
+    self_contained:  false
+    css: ["default", "default-fonts", "./css/styles.css"]
+    seal: false 
+    lib_dir: libs
+    nature:
+      # autoplay: 5000
+      highlightStyle: solarized-light
+      highlightLanguage: ["r", "css", "yaml"]
+      # slideNumberFormat: "" 
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+      titleSlideClass: [top, right]
+---
+
+class: middle, center
+
+# Biostatistics for Longitudinal Data
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+May 26, 2021
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
+
+library(Hmisc)
+library(knitr)
+library(tidyverse)
+library(kableExtra)
+library(gridExtra)
+library(plotly)
+library(nlme)
+library(emmeans)
+library(arsenal)
+library(grid)
+library(gridExtra)
+library(mvtnorm)
+library(mice)
+
+options(digits=2)
+
+theme_set(theme_bw())
+
+# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <-
+    c("#0072B2", "#D55E00", "#E69F00",
+      "#009E73", "#F0E442", "#999999",
+      "#000000", "#56B4E9", "#CC79A7")
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+scale_colour_discrete <-
+    function(...) scale_colour_manual(..., values = cbbPalette)
+scale_fill_discrete <-
+    function(...) scale_fill_manual(..., values = cbbPalette)
+
+theme_table <- function(..., levs=2){
+  theme_minimal(...) + 
+    theme(
+      panel.grid = element_blank(), 
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(face='bold', color=cbbPalette[1:levs]),
+      axis.title = element_blank())
+}
+
+load('simulated-trial.Rdata')
+```
+  
+```{r knitr-options, echo=FALSE, message=FALSE, warning=FALSE, purl=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = NA,
+  echo = FALSE, cache = FALSE, 
+  cache.path = 'long_cache/',
+  fig.path = 'long_fig/',
+  dev='svg',
+  tidy=FALSE,
+  out.extra = '',
+  out.width='100%',
+  fig.align = 'center', crop = TRUE, fig.pos = '!h', 
+  fig.height=3, fig.width=3*2.2,
+  message = FALSE, 
+  warning = FALSE
+)
+# knitr::knit_hooks$set(inline = function(x) {
+#   prettyNum(x, big.mark=",")
+# })
+# purl('imaging.Rmd')
+```
+
+
+```{r load_refs, include=FALSE, cache=FALSE, purl=FALSE}
+library(RefManageR)
+BibOptions(check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 1)
+bib <- ReadBib("./references.bib", check = FALSE)
+NoCite(bib, c('fitzmaurice2012applied', 'molenberghs2007missing', 'verbeke2000linear', 'diggle2002analysis'))
+# Citet(), Citep(), AutoCite()
+```
+
+.pull-left[
+
+```{r echo=FALSE, fig.align='center', out.width='57%', purl=FALSE}
+knitr::include_graphics("./images/atri.png")
+```
+
+]
+
+.pull-right[
+
+```{r echo=FALSE, fig.align='center', out.width='47%', purl=FALSE}
+knitr::include_graphics("./images/actc_logo.png")
+```
+
+]
+
+---
+
+# Session 3 Outline
+
+.large[
+- Mixed effect models
+- Mean & Variance Structure
+- Mixed Model for Repeated Measures (MMRM)
+- Constrained Longitudinal Analysis (cLDA)
+- Model selection strategies 
+- Missing Data, MAR, MNAR
+- Multiple Imputation & Delta Method
+]
+
+---
+
+class: inverse, middle, center
+
+# Mixed Models
+
+---
+
+# Linear mixed-effects model (LME)
+Linear mixed-effects models provide a cleaner, more efficient, and more accurate one-step alternative to two-stage models
+\begin{displaymath}
+\left. \begin{array}{ll}
+\textrm{Stage 1: } \textrm{ADAS}_{ij} &= \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_{ij}
+\textrm{Stage 2: } \hat\beta_{1i} &= X_i\beta + \varepsilon'_{ij}
+  \end{array} \right\} \rightarrow
+  \textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}
+\end{displaymath}
+
+
+* $X_i$: covariates for subject $i=1,\ldots,400$
+* $\beta$: population level ``_fixed effects}''
+* $b_i \sim \N(0,D)$: subject-specific ``_random effects}'' for subject $i=1,\ldots,400$
+* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \N(0,\Sigma)$: vector of ``_residuals}'' for subject $i=1,\ldots,400$
+* $D,\, \Sigma$: ``_variance components}''
+
+
+$b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N$ are assumed independent
+
+---
+
+# Linear mixed-effects models of simulated trial
+
+```{r trial_lme, size = 'tiny'}
+fit_lme <- lme(ADAS11 ~ month + month:active, data = trial_obs, random = ~month|id)
+summary(fit_lme)
+```
+
+---
+
+# LME model with additional covariates
+
+```{r trial_lme_age, size = 'tiny'}
+fit_lme_cov <- lme(ADAS11 ~ age_c + female + month + month:active, data = trial_obs, random = ~month|id)
+summary(fit_lme_cov)
+```
+
+---
+
+# Linear mixed-effects models (R code)
+
+```{r trial_lme_rcode, eval = FALSE, echo = TRUE}
+lme(ADAS11 ~ month + month:active, 
+  data = trial_obs, random = ~month|id)
+
+lme(ADAS11 ~ age_c + female + month + month:active, 
+  data = trial_obs, random = ~month|id)
+```
+
+```{r trial_lme_profiles, echo = FALSE, size = 'scriptsize'}
+em <- fit_lme_cov %>%
+  ref_grid(at = list(
+    month = unique(trial_obs$month),
+    active = unique(trial_obs$active),
+    female = 1, age.c = 0)) %>%
+  emmeans(specs = c('active', 'month')) %>%
+  as.data.frame()
+```
+
+---
+
+# Mean profiles
+
+```{r echo = FALSE, size = 'scriptsize'}
+em %>% kable()
+```
+
+---
+
+# Modeled mean profiles (shaded CIs)
+
+```{r echo = FALSE, size = 'scriptsize'}
+p <- em %>%
+  mutate(group = factor(active, levels = c(0,1), labels = c('Placebo', 'Active'))) %>%
+  ggplot(aes(x = month, y = emmean, group = group)) +
+  geom_line(aes(color=group)) +
+  geom_ribbon(aes(ymin = lower.CL, ymax = upper.CL, fill=group), alpha=0.25) +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS (95% CI)') +
+  theme(legend.position=c(0.1, 0.75))
+grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
+```
+
+---
+
+# Plotting profiles (error bar CIs)
+
+```{r echo = FALSE, size = 'scriptsize'}
+p <- em %>%
+  mutate(group = factor(active, levels = c(0,1), labels = c('Placebo', 'Active'))) %>%
+  ggplot(aes(x = month, y = emmean, group = group, color=group))+
+  geom_line() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width=0, position=position_dodge(0.2)) +
+  ylab('Mean ADAS (95% CI)') +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS (95% CI)') +
+  theme(legend.position=c(0.1, 0.75))
+grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
+```
+
+
+```{r varPar, echo=FALSE}
+# simulate data with different variance parameters
+varPar <- expand.grid(
+  sigma_random_intercept = c(2, 10),
+  sigma_random_slope = c(0.2, 0.75),
+  sigma_residual = c(2, 8)
+)
+
+varPlot <- do.call(rbind, lapply(1:nrow(varPar), function(i){
+  set.seed(20170714)
+  subjects <- data.frame(
+    id = 1:(2*n),
+    active = sample(c(rep(0,n), rep(1,n)), 2*n),
+    female = sample(0:1, 2*n, replace=TRUE),
+    age = rnorm(2*n, 75, 7.8),
+    censor = rexp(2*n,rate=attrition_rate),
+    sigma_random_intercept = varPar[i, 'sigma_random_intercept'],
+    sigma_random_slope = varPar[i, 'sigma_random_slope'],
+    sigma_residual = varPar[i, 'sigma_residual'],
+    ran.intercept = rnorm(2*n, sd=varPar[i, 'sigma_random_intercept']),
+    ran.slope     = rnorm(2*n, sd=varPar[i, 'sigma_random_slope'])) %>%
+    mutate(age_c = age - mean(age))
+
+  trial <- right_join(subjects, 
+    expand.grid(id = 1:(2*n), month=months)) %>%
+    mutate(
+      residual = rnorm(2*n*length(months), sd=varPar[i, 'sigma_residual']),
+      group = factor(active, 0:1, c('placebo', 'active')),
+      missing = ifelse(month>censor, 1, 0)) %>%
+    arrange(id, month) %>%
+    filter(!missing)
+  trial$ADAS11 <- round(
+    model.matrix(~ female+age_c+month+month:active, data = trial)[, names(Beta)] %*% 
+    Beta +
+    with(trial, ran.intercept + ran.slope*month + residual), 
+    digits = 0
+  )[,1]
+  trial
+}))
+```
+
+---
+
+# Mixed effect models: standard deviation of residuals
+
+```{r }
+ggplot(filter(varPlot, sigma_random_intercept==2 & sigma_random_slope==0.2), 
+  aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  facet_wrap(~paste('Residual SD =', sigma_residual)) +
+  ylim(0,70) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.1,0.8))
+```
+
+---
+
+# Mixed effect models: standard deviation of random intercepts
+
+```{r }
+ggplot(filter(varPlot, sigma_residual==2 & sigma_random_slope==0.2), 
+  aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  facet_wrap(~paste('Random intercept SD =', sigma_random_intercept)) +
+  ylim(0,70) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.6,0.8))
+```
+
+---
+
+# Mixed effect models: standard deviation of random slopes
+
+```{r }
+ggplot(filter(varPlot, sigma_residual==2 & sigma_random_intercept==2), 
+  aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  facet_wrap(~paste('Random slope SD =', sigma_random_slope)) +
+  ylim(0,70) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.1,0.8))
+```
+
+---
+
+# Random intercepts model
+
+* NOTE: With only two timepoints, it is impossible to fit a model with random slopes
+* If we drop the _random slope_ term, $t_{ij}b_{1i}$, what remains is called a _random intercepts_ model:
+
+$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + \varepsilon_i$$
+---
+
+# Random intercepts model
+
+```{r trial_lme_apoe_int, size = 'tiny'}
+fit_lme_int <- update(fit_lme, random = ~1|id)
+summary(fit_lme_int)
+```
+
+---
+
+# Random intercepts model vs model with random slopes
+
+```{r trial_lme_apoe_int_vs_slope, size = 'footnotesize', echo = TRUE}
+anova(fit_lme_int, fit_lme)
+```
+
+The model with random slopes is preferred (smaller AIC is better)
+
+---
+
+class: inverse, middle, center
+
+# Mean & Variance Structure
+
+---
+
+# Key features of longitudinal models
+
+* Last session we discussed a linear mixed effect model (LME) which treats time as a continuous variable
+* This is one type of longitudinal model among many types
+* Three key features of longitudinal models:
+  * **Mean structure**: Governs shape of mean trajectory
+  * **Variance-covariance structure**: Governs within-subject correlation
+  * **Baseline assessment**: Treated as covariate or outcome
+
+---
+
+# Taxonomy of common longitudinal models
+
+|                        | **MMRM**             | **LDA**              | **cLDA**             |
+|------------------------|----------------------|----------------------|----------------------|
+|**Mean structure**      | cat. time            | cat. or cts. time    | cat. or cts. time    |
+|**Variance-covariance** | correlated residuals | correlated residuals | correlated residuals |
+|                        |                      | or random effects    |  or random effects   |  |**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
+|                        |                      | different means      |  common mean         | 
+|                        |                      | per group            |  per group           | 
+|------------------------|----------------------|----------------------|----------------------|
+
+Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA; cat., categorical; cts., continuous.
+
+---
+
+# Linear mixed-effects model (LME)
+
+$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$
+* $X_i$: covariates for subject $i=1,\ldots,400$
+* $\beta$: population level "_fixed effects_"
+* $b_i \sim \N(0,D)$: subject-specific "_random effects}'' for subject $i=1,\ldots,400$
+* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \N(0,\Sigma)$: vector of "_residuals_" for subject $i=1,\ldots,400$
+* $D,\, \Sigma$: "_variance components_"
+
+
+$b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N$ are assumed independent
+
+---
+
+# Linear mixed-effects model (LME)}
+\begin{displaymath}
+  \textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}
+\end{displaymath}
+
+* "_Mean structure_" (fixed effects): $X_i\beta$
+    * linear, quadratic, or categorical time; and
+    * other fixed-effect covariates (age, education, gender, treatment)
+* "_Variance structure_" (random effects & residuals): $b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$
+    * random intercept, random intercept & slope; or
+    * impose variance-covariance (variance and correlation) structure on residuals $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \N(0,\Sigma)$
+
+---
+
+class: inverse, middle, center
+
+# MMRM
+
+---
+
+# "Mixed Model of Repeated Measures" (MMRM)}
+
+* A popular _marginal model_, "Mixed Model of Repeated Measures" (MMRM), makes no (or very general) assumptions about the mean and variance/covariance structure.
+* _Unstructured mean_: time is treated as categorical, so no linear (or quadratic, etc.) trend is assumed
+* _Unstructured variance/covariance_: includes parameters for variance at each visit (``heterogeneous'') and visit-to-visit correlation
+* A repeated measures extension of ANCOVA (instead of one post-baseline assessment, there are several)
+* MMRM is not actually a mixed-effects model (no random effects)!
+* Usually treats change from baseline as outcome variable, and baseline as covariate (like ANCOVA).
+
+---
+
+# Mean structure examples
+```{r }
+# fixed effects parameters estimated from ADNI
+Beta <- c(
+   '(Intercept)'=19.60, # mean ADAS at baseline
+        'female'=-0.78, # better scores for females
+           'age'= 0.01, # worse per year of age at baseline
+         'month'= 0.40, # worse per month post baseline
+  'month:active'=-0.05) # improvement per month with treatment
+
+# standard deviations for random effects
+sigma_random_intercept <- 6.0
+sigma_random_slope <- 0.42
+sigma_residual <- 3.1
+
+# other design parameters
+months <- c(0, 6, 12, 18)
+n <- 200 # per group
+attrition_rate <- 0.40/18 # approx per month
+
+# set seed so that simulation is reproducible
+set.seed(20170701)
+
+# simulate subject specific data
+subjects <- data.frame(
+  id = 1:(2*n),
+  active = sample(c(rep(0,n), rep(1,n)), 2*n),
+  female = sample(0:1, 2*n, replace=TRUE),
+  age = rnorm(2*n, 75, 7.8),
+  censor = rexp(2*n,rate=attrition_rate),
+  ran.intercept = rnorm(2*n, sd=sigma_random_intercept),
+  ran.slope     = rnorm(2*n, sd=sigma_random_slope))
+
+# simulate data over time
+trial <- right_join(subjects, 
+  expand.grid(id = 1:(2*n), month=months)) %>%
+  mutate(
+    residual = rnorm(2*n*length(months), sd=sigma_residual),
+    group = factor(active, 0:1, c('placebo', 'active')),
+    missing = ifelse(month>censor, 1, 0)) %>%
+  arrange(id, month)
+
+# calculate the ADAS scores with random effects and residuals and 
+# round to nearest digit in 0-70
+trial <- mutate(trial,
+  ADAS11 = (model.matrix(~ female+age+month+month:active, trial)[, names(Beta)] %*% Beta)[,1],
+  ADAS11 = round(ADAS11 + ran.intercept + ran.slope*month + residual, digits = 0),
+  ADAS11 = replace(ADAS11, ADAS11<0, 0),
+  ADAS11 = replace(ADAS11, ADAS11>70, 70))
+
+# filter out the missing observations
+trial_mmrm <- filter(trial, !missing)
+
+# transfrom data from long to wide
+trial_wide <- trial_mmrm %>%
+  select(id, month, female, age, active, group, ADAS11) %>% 
+  mutate(month = paste0('ADAS11.m', month)) %>%
+  spread(month, ADAS11) %>%
+  select(id:group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
+
+# data for MMRM
+trial_mmrm <- right_join(
+  select(trial_wide, id, ADAS11.m0), 
+  filter(trial_mmrm, month>0)) %>%
+  mutate(ADAS11.ch = ADAS11 - ADAS11.m0)
+```
+
+```{r }
+means <- expand.grid(female=1, age=70, month=0:18, active=0, id=1:3) %>%
+  filter(id %in% c(1,2) | month %in% months) 
+means <- mutate(means,
+    ADAS11 = (model.matrix(~ female+age+month+month:active, means)[, names(Beta)] %*% Beta)[,1],
+    ADAS11 = replace(ADAS11, ADAS11<0, 0),
+    ADAS11 = replace(ADAS11, ADAS11>70, 70),
+    ADAS11 = replace(ADAS11, id == 2, ADAS11 + month*month*0.1),
+    ADAS11 = replace(ADAS11, id == 3 & month == 0, ADAS11 + 0),
+    ADAS11 = replace(ADAS11, id == 3 & month == 6, ADAS11 + 10),
+    ADAS11 = replace(ADAS11, id == 3 & month == 12, ADAS11 + 2),
+    ADAS11 = replace(ADAS11, id == 3 & month == 18, ADAS11 + 25)) %>%
+  filter(id %in% 1:3) %>%
+  mutate(Mean = factor(id, labels=c('linear', 'quadratic', 'categorical')))
+
+ggplot(means, aes(x=month, y=ADAS11, group=Mean, color=Mean)) + 
+  geom_line() +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.15,0.8))
+```
+
+---
+
+# Variance-covariance structure}
+\begin{displaymath}
+  \textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}
+\end{displaymath}
+
+
+* _Vanilla} LME assumes _homoscedastic} (homogenous/constant variance), independent residuals
+* MMRM drops the $b$ terms and can assume _heteroscedastic} (heterogeneous variance), correlated residuals
+  
+  * $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \N(0,\Sigma)$
+  * $\Sigma = \sigma^2VCV$, where
+  * $\sigma^2$ is variance scale parameter
+  * $V$ is diagonal matrix of standard deviation weights
+  * $C$ is correlation matrix
+
+---
+
+# Variance-covariance structure}
+\[
+(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \N(0,\Sigma),\quad \Sigma = \sigma^2VCV
+\]
+
+Examples:
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{verbatim}
+                        Heterogeneous variance
+                                0  6 12 18
+                             0  1  0  0  0
+                        V =  6  0  2  0  0
+                            12  0  0  7  0
+                            18  0  0  0 10
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{verbatim}
+ Exchangeable/Compound Symmetric              Unstructured/Symmetric
+             0    6   12   18                       0    6   12   18
+        0  1.0  0.2  0.2  0.2                  0  1.0  0.3  0.2  0.1
+    C = 6  0.2  1.0  0.2  0.2             C =  6  0.3  1.0  0.4  0.2
+       12  0.2  0.2  1.0  0.2                 12  0.2  0.4  1.0  0.2
+       18  0.2  0.2  0.2  1.0                 12  0.1  0.2  0.2  1.0
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+
+
+```{r varPar2, echo=FALSE}
+# simulate data with different variance parameters
+varPar <- expand.grid(
+  variance = c('homogeneous', 'heterogeneous'),
+  correlation = c('uncorrelated', 'correlated')
+)
+
+SD <- list(homogeneous = sqrt(rep(4, 4)), heterogeneous = (1:4)*2)
+Cor <- list(uncorrelated = 0, correlated = 0.8)
+
+varPlot <- do.call(rbind, lapply(1:nrow(varPar), function(i){
+  set.seed(20170714)
+  subjects <- data.frame(
+    id = 1:(2*n),
+    active = sample(c(rep(0,n), rep(1,n)), 2*n),
+    female = sample(0:1, 2*n, replace=TRUE),
+    age = rnorm(2*n, 75, 7.8),
+    censor = rexp(2*n,rate=attrition_rate))
+    
+  vv <- diag(SD[[varPar[i,'variance']]])
+  cc <- matrix(Cor[[varPar[i,'correlation']]], nrow=4, ncol=4)
+  diag(cc) <- 1
+  resids <- as.numeric(t(rmvnorm(nrow(subjects), mean=rep(0,4), sigma=vv%*%cc%*%vv)))
+
+  trial <- right_join(subjects, 
+    expand.grid(id = 1:(2*n), month=months)) %>%
+    arrange(id, month) %>%
+    mutate(residual = resids,
+      group = factor(active, 0:1, c('placebo', 'active')),
+      missing = ifelse(month>censor, 1, 0),
+      variance = varPar[i,'variance'],
+      correlation = varPar[i,'correlation']) %>%
+    arrange(id, month) %>%
+    filter(!missing)
+  trial$ADAS11 <- round(
+    model.matrix(~ female+age+month+month:active, data = trial)[, names(Beta)] %*% 
+    Beta + trial$residual, 
+    digits = 0
+  )[,1]
+  trial
+}))
+```
+
+
+---
+
+# Homogeneous vs heterogeneous variance structure}
+```{r }
+ggplot(filter(varPlot, correlation=='correlated'), 
+  aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  facet_wrap(~variance) +
+  ylim(0,50) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.1,0.8))
+```
+
+
+
+---
+
+# Uncorrelated vs correlated residuals}
+```{r }
+ggplot(filter(varPlot, variance=='heterogeneous'), 
+  aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  facet_wrap(~correlation) +
+  ylim(0,50) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position='none')
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+####################################################
+### pilot estimates are from a model fit to ADNI ###
+####################################################
+
+# library(ADNIMERGE) # available for loni.usc.edu
+# adni_ad <- filter(adnimerge, M<=24 & M!=18 & !is.na(ADAS11) & DX.bl=='AD') %>%
+#   mutate(m = as.factor(M),
+#      visNo = as.numeric(m))
+#
+# with(adni_ad, table(m, visNo))
+# fit_adni <- gls(ADAS11 ~ PTGENDER + scale(AGE, scale=FALSE) + m, data=adni_ad,
+#   correlation = corSymm(form = ~ visNo | RID),
+#   weights = varIdent(form = ~ 1 | m) )
+# summary(fit_adni)
+```
+
+
+---
+
+# Let's simulate categorical time data from a hypothetical clinical trial$\ldots$}
+These are all estimates required:
+
+```{r echo=TRUE}
+Beta <- c(
+   '(Intercept)'= 19.8, # mean ADAS at baseline
+        'female'=-0.51, # female perform better
+         'age_c'= 0.04, # worse change for older at baseline (age mean centered)
+            'm6'= 2.23, # worsening at month 6 in pbo
+           'm12'= 4.46, # worsening at month 12 in pbo
+           'm18'= 7.31, # worsening at month 18 in pbo
+     'm6:active'=-0.20, # relative improvement at month 6 with treatment
+    'm12:active'=-0.70, # relative improvement at month 12 with treatment
+    'm18:active'=-1.75) # relative improvement at month 18 with treatment
+
+# other design parameters
+months <- c(0, 6, 12, 18)
+n <- 200 # per group
+attrition_rate <- 0.40/18 # approx per month
+
+# var-cov parameters
+SD <- 6.77                          # standard deviation scale parameter
+vv <- diag(c(1, 1.2, 1.5, 1.8))          # hetergeneous variance weight matrix
+cc <- matrix(0.75, nrow=4, ncol=4)   # correlation matrix
+diag(cc) <- 1
+```
+
+
+```{r }
+# set seed so that simulation is reproducible
+set.seed(20170714)
+
+# simulate subject specific data
+subjects <- data.frame(
+  id = 1:(2*n),
+  active = sample(c(rep(0,n), rep(1,n)), 2*n),
+  female = sample(0:1, 2*n, replace=TRUE),
+  age = rnorm(2*n, 75, 7.8), 
+  censor = rexp(2*n,rate=attrition_rate)) %>%
+  mutate(age_c = age-mean(age))
+  
+# simulate vector of correlated residuals
+resids <- as.numeric(t(rmvnorm(nrow(subjects), mean=rep(0,nrow(vv)), sigma=SD^2*vv%*%cc%*%vv)))
+
+# simulate data over time
+trial <- right_join(subjects,
+  expand.grid(id = 1:(2*n), month=months)) %>%
+  arrange(id, month) %>%    ## WARNING: data must be properly sorted by subject and time 
+  mutate(residual = resids, ## prior to appending residuals
+    group = factor(active, 0:1, c('placebo', 'active')),
+    missing = ifelse(month>censor, 1, 0),
+    m = as.factor(month),
+    visNo = as.numeric(m)) %>%
+  arrange(id, month)
+
+# create visit indicators
+trial <- cbind(trial, model.matrix(~ -1+m, data = trial))
+
+# calculate the ADAS scores with random effects and residuals and 
+# round to nearest digit in 0-70
+trial <- mutate(trial,
+  ADAS11 = (model.matrix(~ female+age_c+m6+m12+m18+(m6+m12+m18):active, data = trial)[, names(Beta)] %*% Beta)[,1],
+  ADAS11 = round(ADAS11 + residual, digits = 0),
+  ADAS11 = replace(ADAS11, ADAS11<0, 0),
+  ADAS11 = replace(ADAS11, ADAS11>70, 70))
+
+# filter out the missing observations
+trial_obs <- filter(trial, !missing)
+
+# transfrom data from long to wide
+trial_wide <- trial_obs %>%
+  select(id, month, female, age, age_c, active, group, ADAS11) %>% 
+  mutate(month = paste0('ADAS11.m', month)) %>%
+  spread(month, ADAS11) %>%
+  select(id:group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
+
+# data for MMRM
+trial_mmrm <- right_join(
+  select(trial_wide, id, ADAS11.m0), 
+  filter(trial_obs, month>0)) %>%
+  mutate(ADAS11.ch = ADAS11 - ADAS11.m0,
+    m = as.factor(month),
+    visNo = as.numeric(m))
+```
+
+
+---
+
+# The pseudo categorical time data}
+
+```{r }
+head(select(trial_mmrm, -group, -missing, -m))
+```
+}
+
+
+
+---
+
+# The pseudo categorical time data}
+
+```{r spaghetti_plot}
+ggplot(trial, aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'loess', size = 2) +
+  scale_x_continuous(breaks=months, lim=c(0,18)) +
+  theme(legend.position=c(0.1, 0.85))
+```
+}
+
+
+
+---
+
+# Fitting MMRM in R}
+```{r echo = TRUE}
+# Symmetric correlation, hetergeneous variance
+MMRMsymHet <- gls(ADAS11.ch ~ 
+  -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_mmrm, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# Compound Symmetric correlation, hetergeneous variance
+MMRMcompSymHet <- gls(ADAS11.ch ~ 
+  -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_mmrm, correlation = corCompSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# see ?corClasses and ?varClasses for more options
+```
+
+
+
+---
+
+# MMRM summaries in R}
+```{r echo=TRUE, eval=FALSE}
+summary(MMRMsymHet)
+```
+```{r }
+x <- summary(MMRMsymHet)
+print(summary(x$modelStruct), sigma = x$sigma,
+reEstimates = x$coef$random, verbose = verbose)
+```
+
+
+
+---
+
+# MMRM summaries in R}
+```{r }
+cat('Coefficients:\n')
+xtTab <- as.data.frame(x$tTable)
+printCoefmat(x$tTable, eps=0.001, digits=3)
+# cat("\nStandardized residuals:\n")
+# print(x$residuals)
+cat("\n")
+cat("Residual standard error:", format(x$sigma),"\n")
+# cat("Degrees of freedom:", dd[["N"]],"total;",dd[["N"]] - dd[["p"]],
+#     "residual\n")
+```
+
+
+
+---
+
+# Fitting cLDA in R}
+```{r echo = TRUE}
+# Symmetric correlation, hetergeneous variance
+cLDAsymHet <- gls(ADAS11 ~ 
+  -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_obs, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# Compound Symmetric correlation, hetergeneous variance
+cLDAcompSymHet <- gls(ADAS11 ~ 
+  -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_obs, correlation = corCompSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# see ?corClasses and ?varClasses for more options
+```
+
+
+
+---
+
+# cLDA summaries in R}
+```{r }
+x <- summary(cLDAsymHet)
+print(summary(x$modelStruct), sigma = x$sigma,
+reEstimates = x$coef$random, verbose = verbose)
+```
+
+
+
+---
+
+# MMRM summaries in R}
+```{r }
+cat('Coefficients:\n')
+xtTab <- as.data.frame(x$tTable)
+printCoefmat(x$tTable, eps=0.001, digits=3)
+# cat("\nStandardized residuals:\n")
+# print(x$residuals)
+cat("\n")
+cat("Residual standard error:", format(x$sigma),"\n")
+# cat("Degrees of freedom:", dd[["N"]],"total;",dd[["N"]] - dd[["p"]],
+#     "residual\n")
+```
+
+
+
+---
+
+# Fitting continuous time cLDA in R}
+```{r echo = TRUE}
+# Linear time, random intercept
+cLDAlin <- lme(ADAS11 ~ 
+  female + age_c + month + month:active,
+  data=trial_obs, random = ~1|id)
+
+# Quadratic time, random intercept
+cLDAquad <- lme(ADAS11 ~ 
+  female + age_c + (month + I(month^2)) + (month + I(month^2)):active,
+  data=trial_obs, random = ~1|id)
+```
+
+
+```{r echo = FALSE, size = 'scriptsize'}
+plotData0 <- filter(trial_obs, !duplicated(paste(month, active))) %>%
+  arrange(active, month) %>%
+  mutate(female = 1, age_c=0) %>%
+  select(-age, -censor, -residual, -ADAS11)
+
+plotMatrix_quad <- model.matrix(~ female + age_c + (month + I(month^2)) + (month + I(month^2)):active, 
+  data = plotData0)
+
+plotMatrix_cat <- model.matrix(~ -1 + female + age_c + m0 + (m6 + m12 + m18) + (m6 + m12 + m18):active, 
+  data = plotData0)
+
+plotData <- bind_rows(
+  bind_cols(plotData0, as.data.frame(confint(glht(cLDAquad, linfct = plotMatrix_quad))$confint)) %>%
+    mutate(model = 'quadratic time'),
+  bind_cols(plotData0, as.data.frame(confint(glht(cLDAsymHet, linfct = plotMatrix_cat))$confint)) %>%
+    mutate(model = 'categorical time'))
+```
+
+
+---
+
+# Modeled mean profiles}
+```{r }
+summaryTable <- trial_obs %>% 
+  group_by(group, month) %>%
+  summarise(
+    n=length(ADAS11),
+    mean=mean(ADAS11),
+    sd=sd(ADAS11),
+    lower95 = smean.cl.normal(ADAS11)[['Lower']],
+    upper95 = smean.cl.normal(ADAS11)[['Upper']],
+    min=min(ADAS11),
+    max=max(ADAS11))
+countTab <- ggplot(summaryTable, aes(x=month, y=group, label=n)) + geom_text() + theme_table()
+
+p <- ggplot(plotData, aes(x = month, y = Estimate))+
+  geom_line(aes(color=group, linetype=model)) +
+  geom_point(aes(color=group)) +
+  ylim(c(15,30)) +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS (95% CI)') +
+  theme(legend.position='top')
+grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
+```
+
+
+```{r }
+contrastData0 <- filter(trial_obs, !duplicated(paste(month, active))) %>%
+  arrange(active, month) %>%
+  filter(active==1 & month>0) %>%
+  mutate(female = 1, age_c=0) %>%
+  select(-age, -censor, -residual, -ADAS11)
+
+contrastMatrix_quad <- as.data.frame(model.matrix(~ female + age_c + (month + I(month^2)) + (month + I(month^2)):active, 
+  data = contrastData0)) %>%
+  mutate('(Intercept)' = 0, female=0, month=0, 'I(month^2)' = 0)
+
+contrastMatrix_cat <- as.data.frame(model.matrix(~ -1 + female + age_c + m0 + (m6 + m12 + m18) + (m6 + m12 + m18):active, 
+  data = contrastData0)) %>%
+  mutate(female=0, m0=0, m6=0, m12=0, m18=0)
+
+rownames(contrastMatrix_quad) <- rownames(contrastMatrix_cat) <- paste0('m', months[-1])
+```
+
+
+---
+
+# Modeled group contrasts for quadratic and categorical time models}
+```{r }
+summary(glht(cLDAquad, linfct = as.matrix(contrastMatrix_quad)))
+```
+
+
+
+---
+
+# Modeled group contrasts for quadratic and categorical time models}
+```{r }
+summary(glht(cLDAsymHet, linfct = as.matrix(contrastMatrix_cat)))
+```
+
+---
+
+# Taxonomy of common longitudinal models
+
+|                        | **MMRM**             | **LDA**              | **cLDA**             |
+|------------------------|----------------------|----------------------|----------------------|
+|**Mean structure**      | cat. time            | cat. or cts. time    | cat. or cts. time    |
+|**Variance-covariance** | correlated residuals | correlated residuals | correlated residuals |
+|                        |                      | or random effects    |  or random effects   |  |**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
+|                        |                      | different means      |  common mean         | 
+|                        |                      | per group            |  per group           | 
+|------------------------|----------------------|----------------------|----------------------|
+
+Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA; cat., categorical; cts., continuous.
+
+---
+
+# MMRM vs cLDA
+
+* Both (can use) categorical time
+* _MMRM} has _change from baseline} as outcome, baseline assessment as covariate
+  
+  *[$\rightarrow$] need follow-up data to calculate change
+  *[$\rightarrow$] modified Intention-to-Treat (mITT) population (i.e. randomized and at least one follow-up assessment)
+  
+* _cLDA} uses raw assessment scores as outcome; baseline assessment as outcome, constrains two groups to have same mean
+  
+  *[$\rightarrow$] only need one observation to enter into analysis
+  *[$\rightarrow$] "_unmodified_" Intention-to-Treat population (i.e. randomized with at least one assessment)
+  
+* In our simulated trial it is a difference of $n=46$ subjects
+
+Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA.
+
+---
+
+# MMRM vs cLDA
+
+From Lu (2010):
+
+* cLDA more powerful than MMRM (aka ``longitudinal ANCOVA'') when baseline assessments are missing
+* cLDA advantage is greater when correlation between baseline and follow-up is weaker
+
+Caveat: Implicitly assumes data Missing at Random.
+\foot{Lu, K. (2010). On efficiency of constrained longitudinal data analysis versus longitudinal analysis of covariance. _Biometrics}, 66(3), 891-896.}
+
+
+
+---
+
+class: inverse, middle, center
+
+# Missingness
+
+---
+
+# Missing Data: Notation
+
+* Measurement: $Y_{ij}$ (e.g. $\textrm{ADAS}_{ij}$)
+* Covariates: $X_{i}$ (e.g. treatment, gender, age, \ldots)
+* Missingness indicator:
+    \begin{displaymath}
+     R_{ij} = \left\{
+     \begin{array}{l}
+       1 \textrm{ if }Y_{ij}\textrm{ is observed}
+       0 \textrm{ otherwise}
+      \end{array} \right.
+    \end{displaymath}
+* Let $\mathbf{Y}_i = (Y_{i1},\ldots,Y_{in_i})' = (\mathbf{Y}_i^o, \mathbf{Y}_i^m)$, where
+     \begin{displaymath}
+     \left\{
+     \begin{array}{l}
+       \mathbf{Y}_i^o \textrm{ observed }Y_{ij}
+       \mathbf{Y}_i^m \textrm{ un-observed }Y_{ij}
+      \end{array} \right.
+    \end{displaymath}
+* $D_i$ is time of dropout
+* $\theta$ parameters that control $\mathbf{Y}_i$ (e.g. effects for treatment, gender, age, \ldots)
+* $\psi$ parameters that control $\mathbf{R}_i$ (e.g. treatment effect, $\mathbf{Y}_i^m$, \dots)
+
+The notation is supposed to be a helpful shorthand. If it's not helpful, don't worry about it!
+
+---
+
+# Taxonomy of missing data mechanism
+
+Missing data mechanisms are defined in terms of the assumed distribution function, $F$, or ``data generating mechanism,'' for the missingness indicator $R_i$
+
+\bigskip
+\begin{tabular}{lll}
+% Full joint distribution &
+%   $(\mathbf{Y}_i, \mathbf{R}_i) \sim F(X_i, \theta, \psi)$
+\hline
+\hline
+Term & Notation & Missingness depends on:
+\hline
+\rowcolor[gray]{.9} 
+  Missing **Completely} at Random & 
+  $\mathbf{R}_i \sim F(X_i, \psi)$ &
+  covariates
+Missing at Random & 
+  $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$ &
+  covariates
+  && observed assessments
+\rowcolor[gray]{.9}
+Missing **Not} at Random & 
+\rowcolor[gray]{.9}
+  $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$ &
+  covariates
+\rowcolor[gray]{.9}
+  && observed assessments
+\rowcolor[gray]{.9}
+  && **unobserved} assessments
+\hline
+\end{tabular}
+\bigskip
+
+We'll unpack these a bit \ldots
+
+---
+
+# Missing _Completely} at Random (MCAR)
+
+$\mathbf{R}_i \sim F(X_i, \psi)$: Missingness (may) depend only on observed covariates ($X_i$)
+
+Appropriate methods:
+
+* Complete Case (e.g. ANCOVA) (?)
+* Last Observation Carried Forward (LOCF) (?)
+* Single imputation (?)
+
+
+
+
+---
+
+# Missing at Random (MAR)}
+$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$: Missingness (may) depend on observed covariates ($X_i$) and/or observed outcomes ($\mathbf{Y}_i^o$)
+
+Appropriate methods:
+
+* **Direct likelihood (e.g. mixed-effects models, MMRM, cLDA)!},
+* Multiple imputation
+* Weighted generalized estimating equations (WGEE)
+
+
+
+
+---
+
+# Missing _Not} at Random (MNAR)}
+$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$: Missingness (may) depend on observed covariates ($X_i$), observed outcomes ($\mathbf{Y}_i^o$), and unobserved outcomes ($\mathbf{Y}_i^m$)
+
+Appropriate sensitivity analyses (?):
+
+* selection models: $f(\mathbf{Y}_i|X_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$
+* pattern-mixture models (e.g. ``tipping point'' stress test): $f(\mathbf{Y}_i|X_i, \mathbf{R}_i, \theta)f(\mathbf{R}_i|X_i, \psi)$
+* shared-parameter models: $f(\mathbf{Y}_i|X_i, \mathbf{b}_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{b}_i, \psi)$
+
+
+All of these approaches make untestable assumptions about missingness.
+
+We can never completely rule out MNAR, since, if it exists, it depends on variables that we do _not} observe.
+
+
+
+---
+
+# Quiz}
+MCAR, MAR, or MNAR?
+
+* Missingness at month 18 only depends on treatment assignment.
+* Missingness at month 18 only depends on treatment assignment and
+    ADAS at month 12.
+* Missingness at month 18 only depends on treatment assignment and
+    ADAS at month 18.
+
+---
+
+# Missing data: bottom line
+
+* _Missing Not at Random_ is impossible to rule out. The best we can do is _sensitivity analyses_ or apply models that make strong untestable assumptions about missingness mechanism.
+* _Missing Completely At Random_ is an unrealistic and unnecessary assumption.
+* _Missing at Random_ is a more reasonable assumption, and we have reliable methods that are robust in this case.
+
+Direct likelihood (mixed-effects) is recommended. Complete case (ANCOVA), LOCF, and single imputation should be _avoided}.
+
+
+---
+
+class: inverse, middle, center
+
+# Multiple Imputation
+
+
+---
+
+# Multiple imputation (MI)}
+Basic steps:
+
+* Create multiple complete versions of the data with imputed plausible values
+* Analyze each complete version with standard methods (e.g. ANCOVA)
+* Combine the results
+
+Comments:
+
+* MI requires many more modeling decisions than direct likelihood methods (e.g. number of imputations, imputation methods, \ldots)
+* CAUTION: Lots of nuance and complexity
+* Usually reserved for _sensitivity analyses}
+
+
+
+```{r results = 'hide', echo = FALSE}
+# get default predictor matrix
+ini_mi <- mice(trial_wide, maxit = 0, print = FALSE)
+predictorMatrix <- ini_mi$predictorMatrix
+# Don't want ADAS11.m12 predict by ADAS11.m18, etc.:
+predictorMatrix['ADAS11.m12', 'ADAS11.m18'] <- 0
+predictorMatrix['ADAS11.m6', 'ADAS11.m12'] <- 0
+predictorMatrix['ADAS11.m6', 'ADAS11.m18'] <- 0
+```
+
+
+---
+
+# 1. Create multiple complete versions}
+```{r results = 'hide', echo = TRUE}
+trial_imp <- mice(trial_wide, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100)
+```
+```{r echo = TRUE, size = 'scriptsize'}
+head(trial_wide)    # raw data with missing values:
+head(complete(trial_imp)) # first complete version:
+```
+
+
+
+---
+
+# 2. Analyze each complete version}
+```{r echo = FALSE, size = 'scriptsize'}
+fits_mi <- with(data=trial_imp, lm(ADAS11.m18~active*center(ADAS11.m0)))
+summary(fits_mi)
+```
+
+
+
+---
+
+# 3. Combine the results}
+```{r echo = FALSE}
+printCoefmat(summary(pool(fits_mi))[,1:5],eps=0.001,digits=3)
+```
+
+
+
+---
+
+# ``Tipping point'' MNAR stress test}
+```{r }
+post <- trial_imp$post
+k_tipping <- seq(1, 2.5, 0.25)
+est_tipping <- vector("list", length(k_tipping))
+for (k in 1:length(k_tipping)){
+  # increase imputed ADAS11.m18 in the active group by 
+  # factor of k x MAR treatment estimate (3.1)
+  # (nullify the imputed treatment effect to varying degrees)
+  post["ADAS11.m18"] <- paste("imp[[j]][,i] <- imp[[j]][,i] + ", k_tipping[k], "* 4.0 * p$data$active[!r[,j]]")
+  imp_k <- mice(trial_wide, post=post, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100, print = FALSE)
+  fit_k <- with(imp_k, lm(ADAS11.m18~active*center(ADAS11.m0)))
+  est_tipping[[k]] <- summary(pool(fit_k))['active', 1:5]
+}
+```
+Treatment effects for different MNAR factors:
+```{r echo=FALSE}
+results_tipping <- do.call(rbind, est_tipping)
+results_tipping <- cbind(tipping_factor = k_tipping, results_tipping)
+printCoefmat(results_tipping, eps=0.001, digits=3)
+```
+
+
+
+---
+
+# "Tipping point" MNAR stress test}
+
+```{r }
+imputed_ids <- subset(trial_wide, is.na(ADAS11.m18))[1:5,]$id
+# filter(trial_wide, id %in% imputed_ids)
+```
+Imputed ADAS.m18 assuming under MAR 
+
+```{r }
+# Imputation assuming under MAR 
+filter(complete(trial_imp), id %in% imputed_ids) %>%
+  select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
+```
+
+Imputed ADAS.m18 assuming under MNAR ($k$=`r k_tipping[k]`, $k\times 4=$`r k_tipping[k] * 4.0` ADAS points)
+
+```{r }
+# Imputation under MNAR (k=0.5)
+filter(complete(imp_k), id %in% imputed_ids) %>%
+  select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
+```
+
+---
+
+class: inverse, middle, center
+
+# Estimands
+
+---
+
+# Estimands, Estimators, & Estimates}
+
+* _Estimand}: Target of estimation 
+    e.g. the treatment effect in ITT population
+* _Estimator}: Rules for estimation
+    e.g. final visit contrast based on MMRM
+* _Estimate}: The number derived from applying estimator to data
+    e.g. -3.42 (SE=1.04) ADAS11 point difference between groups
+
+
+
+
+---
+
+# Estimands: Efficacy vs Effectiveness
+
+* _Efficacy, de-jure, per-protocol_: 
+    "an ideal treatment effect that could have been reached if all patients had fully adhered to the treatment"
+* _Effectiveness, de-facto, intention-to-treat_:
+    "the effect seen in practice"
+
+\foot{Akacha, M., Bretz, F., & Ruberg, S. (2017). Estimands in clinical trials–broadening the perspective. _Statistics in Medicine}, 36(1), 5-19.}
+
+
+
+---
+
+# EMA draft guidline for AD
+
+ > [MMRM] tends to be less robust against a decreasing treatment effect difference after treatment
+ discontinuation, which is one reason why in CNS indications the MMRM model often yields effect
+ estimates close to those in the subgroup of patients who complete the study as planned. Therefore it is
+ difficult to endorse the choice of the MMRM model as a routine approach to the primary analysis
+ because of this concern that the results would tend to overestimate the true treatment effect.
+
+
+Committee for Medicinal Products for Human Use (CHMP). Draft guideline on the clinical investigation of 
+medicines for the treatment of Alzheimer's disease and other dementias. European Medicines Agencies. 2016.
+
+---
+
+# EMA draft guidline for AD
+
+_The EMA claim_: MMRM provides estimates which are closer to _efficacy/per-protocol_ than _effectiveness/ITT_.
+
+* Theoretically at least, this claim is false if data after treatment discontinuation are included in the model and missingness is MAR
+* Any method robust to MAR (e.g. mixed-effects model, multiple imputation) could have this same problem if data after treatment discontinuation are omitted
+* Any alternative MNAR approach would necessarily make _untestable_ assumptions about missing data
+* Assessing the magnitude of this problem and potential alternative approaches is an active area of research $\ldots$
+* Perhaps we should postone concerns about effectiveness until an efficacious treatment is identified
+
+---
+
+# Further reading}
+
+
+* Mallinckrodt, C.H., et al. (2003). Assessing and interpreting treatment effects in longitudinal clinical trials with missing data. _Biological psychiatry}, 53(8), 754-760.
+* Pinheiro, J.C., and Bates, D.M. (2000). Mixed-Effects Models in S and S-PLUS. Springer.
+* Lu, K. (2010). On efficiency of constrained longitudinal data analysis versus longitudinal analysis of covariance. _Biometrics}, 66(3), 891-896.
+* Donohue, M.C. and Aisen, P. S. (2012). Mixed model of repeated measures versus slope models in Alzheimer's disease clinical trials. _The journal of nutrition, health & aging}. 16(4), 360-364.
+* Little, R.J.A. and Rubin, D.B. (2014). Statistical analysis with missing data. John Wiley & Sons.
+
+---
+
+# Further reading}
+
+
+* van Buuren S, Groothuis-Oudshoorn K. (2011). mice: Multivariate Imputation by Chained Equations in R. _Journal of Statistical Software} 45, 1-67.
+* Akacha, M., Bretz, F., & Ruberg, S. (2017). Estimands in clinical trials-broadening the perspective. _Statistics in Medicine}, 36(1), 5-19.
+* Committee for Medicinal Products for Human Use (CHMP). Draft guideline on the clinical investigation of 
+medicines for the treatment of Alzheimer's disease and other dementias. European Medicines Agencies. 2016.
+
+---
+
+# References
+
+```{r refs, echo=FALSE, results="asis", purltt=FALSE}
+BibOptions(check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 10)
+PrintBibliography(bib)
+```

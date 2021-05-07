@@ -1,5 +1,5 @@
 ---
-title: Biostatistics for Imaging Biomarkers
+title: Biostatistics for Imaging Biomarkers and Intro to Longitudinal Data
 output: 
   xaringan::moon_reader:
     self_contained:  false
@@ -19,7 +19,7 @@ output:
 
 class: middle, center
 
-# Biostatistics for Imaging Biomarkers
+# Biostatistics for Imaging Biomarkers & Intro to Longitudinal Data
 
 Michael Donohue, PhD
 
@@ -34,11 +34,19 @@ May 26, 2021
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
 
+library(Hmisc)
 library(knitr)
 library(tidyverse)
 library(kableExtra)
 library(gridExtra)
 library(plotly)
+library(nlme)
+library(emmeans)
+library(arsenal)
+library(grid)
+library(gridExtra)
+library(mvtnorm)
+library(mice)
 
 options(digits=2)
 
@@ -57,6 +65,15 @@ scale_colour_discrete <-
     function(...) scale_colour_manual(..., values = cbbPalette)
 scale_fill_discrete <-
     function(...) scale_fill_manual(..., values = cbbPalette)
+
+theme_table <- function(..., levs=2){
+  theme_minimal(...) + 
+    theme(
+      panel.grid = element_blank(), 
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(face='bold', color=cbbPalette[1:levs]),
+      axis.title = element_blank())
+}
 ```
   
 ```{r knitr-options, echo=FALSE, message=FALSE, warning=FALSE, purl=FALSE}
@@ -81,7 +98,6 @@ knitr::opts_chunk$set(
 # purl('imaging.Rmd')
 ```
 
-
 ```{r load_refs, include=FALSE, cache=FALSE, purl=FALSE}
 library(RefManageR)
 BibOptions(check.entries = FALSE,
@@ -104,7 +120,6 @@ knitr::include_graphics("./images/atri.png")
 
 ]
 
-
 .pull-right[
 
 ```{r echo=FALSE, fig.align='center', out.width='47%', purl=FALSE}
@@ -120,7 +135,12 @@ knitr::include_graphics("./images/actc_logo.png")
 .large[
 - Reference Regions
 - Centiloids
-- Machine Learning
+- Standardization using the Empirical Cumulative Distribution Function (ECDF)
+- Intro to longitudinal data analysis
+  - Summaries and plots
+  - Regression
+  - ANCOVA
+  - Two-stage models
 ]
 
 ---
@@ -159,16 +179,16 @@ Examples abound: %ICV, SUVR, BMI, ...
 
 # Ratio as Dependent Variable in Regression
 
-```{r}
+```{r }
 dd2 <- subset(ADNIMERGE::adnimerge, VISCODE=='bl' & !is.na(Hippocampus) & DX=='CN') %>%
   mutate(APOEe4 = ifelse(APOE4>0, 1, 0))
 ```
 
-```{r, echo=TRUE}
+```{r , echo=TRUE}
 lm_fit1_gender <- lm(I(Hippocampus/ICV*100) ~ PTGENDER, data=dd2)
 ```
 
-```{r}
+```{r }
 summary(lm_fit1_gender)$coef %>%
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
@@ -184,11 +204,11 @@ summary(lm_fit1_gender)$coef %>%
 
 # ICV as Covariate Instead of Denominator
 
-```{r, echo=TRUE}
+```{r , echo=TRUE}
 lm_fit2_gender <- lm(Hippocampus ~ ICV + PTGENDER, data=dd2)
 ```
 
-```{r}
+```{r }
 summary(lm_fit2_gender)$coef %>%
   as_tibble(rownames = NA) %>% 
   rownames_to_column(var='Coefficient') %>%
@@ -310,7 +330,7 @@ class: inverse, middle, center
 
 # What is a centiloid? Step 1: PiB SUVr to CL
 
-```{r}
+```{r }
 ggplot() + 
   geom_segment(aes(x=1.009, y=0, xend=2.076, yend=100),
     arrow = arrow(length = unit(0.03, "npc"), ends='both')) +
@@ -404,7 +424,7 @@ But it only works if samples are similar, and we believe both tracers would sort
 
 N (%) per diagnosis and tracer:
 
-```{r, echo=FALSE}
+```{r , echo=FALSE}
 t1 <- with(dd, table(DX, Tracer))
 t2 <- round(with(dd, prop.table(table(DX, Tracer), margin = 2))*100, 1)
 tt <- t1
@@ -415,7 +435,7 @@ kable(tt)
 
 Inverse proportion weights:
 
-```{r}
+```{r }
 invproptab <- 1/with(dd, prop.table(table(DX, Tracer), margin = 2))
 kable(invproptab)
 ```
@@ -424,7 +444,7 @@ kable(invproptab)
 
 # Weighted ECDFs to correct for sample differences
 
-```{r, echo=TRUE}
+```{r , echo=TRUE}
 # Record the sampling adjustment weights in the data
 dd <- dd %>% mutate(
   wt = case_when(
@@ -441,7 +461,7 @@ dd <- dd %>% mutate(
 
 # Weighted ECDFs to correct for sample differences
 
-```{r, echo=TRUE}
+```{r , echo=TRUE}
 # Create adjusted ECDF functions (mapping SUVRs to Cumulative Probabilities)
 PiB.ecdf.data <- with(subset(dd, Tracer == 'PiB'), 
   Hmisc::wtd.Ecdf(SUVR, weights=wt, normwt=TRUE))
@@ -466,7 +486,7 @@ Fbp.inv.ecdf <- approxfun(Probs, Fbp.inv.ecdf.data, rule=2)
 
 # Weighted ECDFs to correct for sample differences
 
-```{r, echo=TRUE}
+```{r , echo=TRUE}
 dd <- dd %>% mutate(
   `Adjusted cumulative probability` = case_when( # 
     Tracer == 'PiB' ~ PiB.ecdf(SUVR),
@@ -584,7 +604,7 @@ knitr::include_graphics("./images/li2019.png")
 
 # Validation on a holdout set with PiB and Florbetapir scans
 
-```{r}
+```{r }
 dd.validate <- full_join(
   ADNIMERGE::adnimerge %>% 
     arrange(RID, EXAMDATE) %>% 
@@ -633,7 +653,7 @@ $^*$ Using PiB = (Florbetapir - 0.502)/0.536 from `r Citet(bib=bib, 'navitsky201
 
 # Validation on a holdout set with PiB and Florbetapir scans
 
-```{r}
+```{r }
 dd.validate %>%
   select(RID, `Years between scans`, Florbetapir, 
     `Navitsky et al linear map of PiB to Florbetapir`,
@@ -664,13 +684,523 @@ class: inverse, middle, center
 
 ---
 
-# Longitudinal Data
+# Repeated Measures/Longitudinal Data
+
+* In Alzheimer's Disease (AD) clinical trials we typically assess study participants _longitudinally_ or _repeatedly_ over time
+* This gives rise to _serial observations_ for each participant at various time points post baseline
+* We cannot treat these serial observations as if they came from different people
+* Our analysis methods must account for _within-subject correlation_
+* There are specialized statistical methods to help accommodate many varieties of _correlated_ or _clustered_ data
+* We will explore _longitudinal data analysis_ approaches commonly employed in AD clinical trials
+* We will demonstrate these methods on a _simulated_ clinical trial dataset 
+
+---
+
+# Repeated Measures/Longitudinal Data
+
+
+```{r echo=FALSE}
+fit_adni <- lme(ADAS11 ~ PTGENDER + scale(AGE,scale=FALSE) + I(Years.bl/12), 
+  data=ADNIMERGE::adnimerge,
+  random=~M|RID, subset = M<=24 & DX.bl=='AD', na.action=na.omit)
+summary(fit_adni)
+```
+
+---
+
+# Let's simulate a hypothetical clinical trial $\ldots$
+
+* Two groups: placebo vs active (hypothetical)
+* $n=200$ mild to moderate dementia subjects per group
+* Alzheimer's Disease Assessment Scale (ADAS-Cog) assessed at 0, 6, 12, 18 months
+* Placebo group behaves like ADNI participants
+* Weak effects for age and sex (based on ADNI pilot estimates)
+* A treatment which slows ADAS-Cog progression by 12.5%
+* Typical attrition ( $\approx$30%)
+
+---
+
+# Let's simulate a hypothetical clinical trial $\ldots$
+Simulation _reverses_ the usual process of statistical modeling/estimation
+
+* Model fitting: Data + Model $\rightarrow$ Parameter Estimates
+* Model simulation: Model + Parameter Estimates $\rightarrow$ Pseudo Data
+* Given a reasonable model, everything can be simulated: mean, variance, missingness, etc.
+* CAUTION: Simulations can only provide information about _models_, but they cannot 
+provide information about _reality_. _Real data_ is required for the latter.
+
+---
+
+# Let's simulate a hypothetical clinical trial $\ldots$
+
+These are all estimates required:
+
+```{r generate_data1, echo=TRUE}
+# fixed effects parameters estimated from ADNI
+Beta <- c(
+   '(Intercept)'=20   , # mean ADAS at baseline
+        'female'=-0.29, # better scores for females
+         'age_c'= 0.06, # worse change for older at baseline (age mean centered)
+         'month'= 0.57, # worse per month post baseline
+  'month:active'=-0.05) # improvement per month with treatment
+
+# standard deviations for random effects
+sigma_random_intercept <- 6.1
+sigma_random_slope <- 0.38
+sigma_residual <- 3.3
+
+# other design parameters
+months <- c(0, 6, 12, 18)
+n <- 200 # per group
+attrition_rate <- 0.40/18 # approx per month
+```
+
+
+```{r }
+# set seed so that simulation is reproducible
+set.seed(20170701)
+
+# simulate subject specific data
+subjects <- data.frame(
+  id = 1:(2*n),
+  active = sample(c(rep(0,n), rep(1,n)), 2*n),
+  female = sample(0:1, 2*n, replace=TRUE),
+  age = rnorm(2*n, 75, 7.8), 
+  censor = rexp(2*n,rate=attrition_rate),
+  ran.intercept = rnorm(2*n, sd=sigma_random_intercept),
+  ran.slope     = rnorm(2*n, sd=sigma_random_slope)) %>%
+  mutate(
+    age_c = age-mean(age),
+    Female = factor(female, levels = c(1, 0), labels = c('Female', 'Male')),
+  )
+
+# simulate data over time
+trial <- right_join(subjects, 
+  expand.grid(id = 1:(2*n), month=months)) %>%
+  mutate(
+    residual = rnorm(2*n*length(months), sd=sigma_residual),
+    group = factor(active, 0:1, c('placebo', 'active')),
+    missing = ifelse(month>censor, 1, 0)) %>%
+  arrange(id, month)
+
+# calculate the ADAS scores with random effects and residuals and 
+# round to nearest digit in 0-70
+trial <- mutate(trial,
+  ADAS11 = (model.matrix(~ female+age_c+month+month:active, trial)[, names(Beta)] %*% Beta)[,1],
+  ADAS11 = round(ADAS11 + ran.intercept + ran.slope*month + residual, digits = 0),
+  ADAS11 = replace(ADAS11, ADAS11<0, 0),
+  ADAS11 = replace(ADAS11, ADAS11>70, 70))
+
+# filter out the missing observations
+trial_obs <- filter(trial, !missing)
+
+# transfrom data from long to wide
+trial_wide <- trial_obs %>%
+  select(id, month, female, age, age_c, active, group, ADAS11) %>% 
+  mutate(month = paste0('ADAS11.m', month)) %>%
+  pivot_wider(names_from = month, values_from = ADAS11)
+
+# data for MMRM
+trial_mmrm <- right_join(
+  select(trial_wide, id, ADAS11.m0), 
+  filter(trial_obs, month>0)) %>%
+  mutate(ADAS11.ch = ADAS11 - ADAS11.m0)
+```
+
+---
+
+# The pseudo data snapshot
+
+```{r }
+head(select(trial_obs, -group, -missing))
+```
+
+---
+
+# The pseudo data: Baseline characteristics
+
+```{r results='asis'}
+tab <- tableby(group ~ Female + age + ADAS11, 
+  data = subset(trial_obs, month == 0))
+
+summary(tab, text=TRUE) %>% kable()
+```
+
+---
+
+# The pseudo data: Spaghetti plot
+
+```{r spaghetti_plot}
+ggplot(trial_obs, aes(x=month, y=ADAS11, group=id, color=group)) + 
+  geom_line(alpha=0.25) +
+  geom_smooth(aes(group = NULL), method = 'lm', size = 2) +
+  scale_x_continuous(breaks=months) +
+  theme(legend.position=c(0.1, 0.85), legend.background = element_rect())
+```
+
+---
+
+# Basic longitudinal summaries of ADAS11
+```{r }
+summaryTable <- trial_obs %>% 
+  group_by(group, month) %>%
+  summarise(
+    n=length(ADAS11),
+    mean=mean(ADAS11),
+    sd=sd(ADAS11),
+    lower95 = Hmisc::smean.cl.normal(ADAS11)[['Lower']],
+    upper95 = Hmisc::smean.cl.normal(ADAS11)[['Upper']],
+    min=min(ADAS11),
+    max=max(ADAS11))
+print(as.data.frame(summaryTable), row.names=FALSE)
+```
+
+---
+
+# Mean ADAS
+
+```{r meanplot}
+p <- ggplot(summaryTable, aes(x=month, y=mean, color=group)) +
+  geom_line() +
+  geom_errorbar(aes(min=lower95, max=upper95), position=position_dodge(0.2), width=0) +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS (95% CI)') +
+  theme(legend.position=c(0.1, 0.75))
+countTab <- ggplot(summaryTable, aes(x=month, y=group, label=n)) + geom_text() + theme_table()
+grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
+```
+
+---
+
+# Basic longitudinal summaries of ADAS11 _change_
+
+```{r }
+chsummaryTable <- trial_mmrm %>% 
+  group_by(group, month) %>%
+  summarise(
+    n=length(ADAS11.ch),
+    mean=mean(ADAS11.ch),
+    sd=sd(ADAS11.ch),
+    lower95 = Hmisc::smean.cl.normal(ADAS11.ch)[['Lower']],
+    upper95 = Hmisc::smean.cl.normal(ADAS11.ch)[['Upper']],
+    min=min(ADAS11.ch),
+    max=max(ADAS11.ch))
+chsummaryTable <- bind_rows(
+  filter(summaryTable, month == 0) %>% 
+    mutate(mean=0, sd=0, lower95=0, upper95=0, min=0, max=0),
+  chsummaryTable) %>%
+  arrange(group, month)
+
+print(as.data.frame(chsummaryTable), row.names=FALSE)
+```
+
+---
+
+# Mean ADAS change (95% CI)
+
+```{r meanchplot}
+p <- ggplot(chsummaryTable, aes(x=month, y=mean, color=group)) +
+  geom_line() +
+  geom_errorbar(aes(min=lower95, max=upper95), position=position_dodge(0.2), width=0) +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS change') +
+  theme(legend.position=c(0.1, 0.75))
+grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
+```
+
+---
+
+class: inverse, middle, center
+
+# $t$-test
+
+---
+
+# Two sample $t$-test of mean change at month 18 (completers analysis)
+
+```{r }
+m1 <- subset(chsummaryTable, group=='active' & month==18)[['mean']]
+m2 <- subset(chsummaryTable, group=='placebo' & month==18)[['mean']]
+n1 <- subset(chsummaryTable, group=='active' & month==18)[['n']]
+n2 <- subset(chsummaryTable, group=='placebo' & month==18)[['n']]
+sd1 <- subset(chsummaryTable, group=='active' & month==18)[['sd']]
+sd2 <- subset(chsummaryTable, group=='placebo' & month==18)[['sd']]
+s <- sqrt(((n1-1)*sd1^2 + (n2-1)*sd2^2)/(n1+n2-2))
+tt <- (m2-m1)/(s*sqrt(1/n2 + 1/n1)) 
+DF <- n1+n2-2
+```
+
+
+* Difference between group means is
+    `r m2` - `r m1`  = `r m2-m1` 
+* (pooled) standard deviation is `r s` 
+*  $t = \frac{`r m2-m1`}{`r s`\sqrt{\frac{1}{`r n2`} + \frac{1}{`r n1`}}} =  `r tt`$
+* `r n2` + `r n1` - 2 = `r DF` "degrees of freedom"
+
+---
+
+# $t$-test
+
+```{r echo=FALSE}
+print(t.test(ADAS11.ch ~ group, data = trial_mmrm, subset = month==18, 
+  var.equal=TRUE), digits = 6)
+```
+
+---
+
+# The $t_{`r DF`}$-distribution
+
+$p$-value is area under curve for $|x|>`r abs(tt)`$, the value of the test statistic in this case.
+
+```{r }
+x <- seq(-5, 5, by = 0.01)
+dens <- data.frame(
+	x        =  x,
+	density  = dt(x, df = DF)
+)
+shadel <- rbind(
+  c(x=-5, y=0),
+  filter(dens, x <= -abs(tt)),
+  c(x=-abs(tt),0))
+shadeu <- rbind(
+  c(x=abs(tt),0),
+  filter(dens, x >= abs(tt)),
+  c(x=5, y=0))
+ggplot(dens, aes(x=x, y=density)) + geom_line() +
+  geom_polygon(data = shadel, aes(x=x, y=density), fill=cbbPalette[1]) +
+  geom_polygon(data = shadeu, aes(x=x, y=density), fill=cbbPalette[1]) +
+  geom_vline(xintercept=qt(c(0.025, 0.975), df=DF), color='grey', linetype='dashed') +
+  annotate('text', x=-1.96, y=0.4, label='x=-1.96') +
+  annotate('text', x=1.96, y=0.4, label='x=1.96')
+```
+
+---
+
+class: inverse, middle, center
+
+# Regression
+
+---
+
+# Regression analysis
+
+* "_Regression_" generally refers to a relationship between variables that is estimated by data
+* "_Ordinary Least Squares_" regression, for example, describes a linear relationship between two continuous variables that is estimated by the line that minimizes the sum of squared "residuals"
+* _predictor/covariate_ $\rightarrow$ _response/outcome_
+* "_Residuals_" are the differences between observations and values predicted by the regression
+
+---
+
+## Ordinary Least Squares: minimizing the sum of squared residuals
+
+```{r regression-movie, fig.show='animate', dev='jpeg'}
+lmfit <- lm(ADAS11.m18 ~ ADAS11.m0, data = trial_wide)
+Fitted <- predict(lmfit)
+
+Coef <- lmfit$coef + c(-3, 0.1)*10
+
+for(i in 1:10){
+  Coef <- Coef + c(3, -0.1)
+  Fitted <- as.matrix(cbind(1, filter(trial_wide, !is.na(ADAS11.m18))['ADAS11.m0'])) %*% Coef
+  p <- ggplot(filter(trial_wide, !is.na(ADAS11.m18)), aes(x=ADAS11.m0, y=ADAS11.m18)) + 
+    geom_point() + geom_abline(intercept=Coef[1], slope=Coef[2]) +
+    xlab('ADAS11 at baseline') +
+    ylab('ADAS11 at 18 months') +
+    geom_segment(aes(x=ADAS11.m0, y=ADAS11.m18, 
+      xend=ADAS11.m0, yend=Fitted), alpha=0.25) +
+    coord_cartesian(ylim=c(range(trial_wide$ADAS11.m18, na.rm=TRUE)))
+  print(p)
+}
+
+p <- ggplot(filter(trial_wide, !is.na(ADAS11.m18)), aes(x=ADAS11.m0, y=ADAS11.m18)) + 
+  geom_point() + geom_smooth(method='lm') +
+  xlab('ADAS11 at baseline') +
+  ylab('ADAS11 at 18 months') +
+  geom_segment(aes(x=ADAS11.m0, y=ADAS11.m18, 
+    xend=ADAS11.m0, yend=Fitted), alpha=0.25) +
+  ylim(range(trial_wide$ADAS11.m18, na.rm=TRUE))
+print(p)
+```
+
+---
+
+# Other types of regression
+
+* "_General linear models_" can add multiple _covariates/predictors_
+* "_Generalized linear models_" can accommodate other types of _outcome/response_ variables (e.g. logistic regression can accommodate binary outcome variables)
+* "_Mixed-effects models_" mix _random effects_ with the standard _fixed effects_ to account for complex correlation structures
+
+All regression models share the common theme of estimating the best fit relationship between
+_outcome/response_ variables and _covariates/predictors_
+
+---
+
+class: inverse, middle, center
+
+# ANCOVA
+
+---
+
+# ANalysis of COVAriance (ANCOVA) for "pre-post" data
+
+* Very common for two groups, and _one_ post- assessment
+* $\textrm{ADAS}_{i1}$: baseline or pre- observation for subject $i$, $i=1,\dots,200$
+* $\textrm{ADAS}_{i2}$: followup or post- observation for subject $i$, $i=1,\dots,200$
+* $\textrm{Active}_i$: treatment group indicator (e.g. 1 if active, 0 if placebo)
+* _ANCOVA I_: $\textrm{ADAS}_{i2} = \beta_0 + \textrm{Active}_i\beta_1 + \textrm{ADAS}_{i1}\beta_2 + \varepsilon_i$
+  * $\beta_0$ is the _intercept_
+  * $\beta_1$ is the estimate of interest: group difference at 18 months
+  * $\beta_2$ controls for baseline ADAS
+  * $\varepsilon_i$ is residual error
+* _ANCOVA II_: $\textrm{ADAS}_{i2} = \beta_0 + \textrm{Active}_i\beta_1 + \textrm{ADAS}_{i1}^*\beta_2 + \textrm{Active}_i\textrm{ADAS}_{i1}^*\beta_3 + \varepsilon_i$
+  * $\beta_3$ controls for interaction of treatment assignment and baseline ADAS
+  * _Need to mean center baseline covariates_: $\textrm{ADAS}_{i1}^* = \textrm{ADAS}_{i1} - \bar{Y}_{\cdot0}$
+  * More efficient (statistical power)
+* "ANCOVA I model also fully efficient if the randomization probability to the treatment arm is 0.5 or when the covariance between the baseline and follow-up responses is the same for both the treatment and control groups"
+  
+`r Citet(bib, 'yang2001efficiency')`
+
+---
+
+# ANCOVA I for effect of treatment on ADAS11 at 18 months
+
+```{r ancovai, echo = FALSE, size = 'scriptsize'}
+summary(lm(ADAS11.ch ~ active + ADAS11.m0, data = trial_mmrm))
+```
+
+---
+
+# ANCOVA II for effect of treatment on ADAS11 at 18 months
+
+```{r echo = FALSE, size = 'scriptsize'}
+center <- function(x) scale(x, scale = FALSE)
+```
+```{r ancovaii, echo = FALSE, size = 'scriptsize'}
+summary(lm(ADAS11.ch ~ active*center(ADAS11.m0), data = trial_mmrm))
+```
+
+---
+
+# ANCOVA II with more covariates
+```{r ancovaii2cov, echo = FALSE, size = 'scriptsize'}
+summary(lm(ADAS11.ch ~ active*center(ADAS11.m0) + female + age_c, data = trial_mmrm))
+```
+
+---
+
+# ANCOVA summary
+
+* Ubiquitous, simple, powerful framework
+* ANCOVA more powerful/efficient than $t$-test
+* Both are inherently **complete case** analyses!
+* With missing data, not intention-to-treat (ITT) analysis
+* Might be biased and/or inefficient (low power) with missing data
+
+---
+
+class: inverse, middle, center
+
+# Two-stage models
+
+---
+
+# Two-stage models
+
+* _Subject-specific_ longitudinal profiles can often be modeled with simple linear regression
+* This leads to the 2-stage model:
+  
+  * _Stage 1_: Linear regression model for each subject separately
+  * _Stage 2_: Model subject-specific regression coefficients with covariates of interest
+  
+* However, this is **NOT** a recommend analysis approach, but rather a means to introduce mixed-effect models.
+
+---
+
+# Two-stage model example
+
+* _Stage 1_: $\textrm{ADAS}_{ij} = \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_i$ for subject $i$ at time $t_{ij}$
+* Provides estimates of subject-specific intercepts, $\hat\beta_{0i}$ and slopes $\hat\beta_{0i}$
+* $\varepsilon_i \sim \mathcal{N}(0,\sigma^2_iI_{n_i})$ estimates _within_-subject variability
+* _Between_-subject variability can now be modeled by treating $\hat\beta_i$ as "response variables"
+* _Stage 2_: $\hat\beta_{1i} = X_i\beta + \varepsilon'_i$
+
+---
+
+# Stage 1 models of simulated trial
+
+```{r trial_stage1_plot, echo = FALSE}
+ggplot(subset(trial, id %in% 1:4),
+  aes(x=month, y=ADAS11, group = id, color = group)) +
+  stat_smooth(method = 'lm') + geom_line() + geom_point() +
+  facet_wrap(~id)
+```
+
+---
+
+# Stage 1 model of simulated trial
+
+```{r trial_fit_stage1, eval = TRUE, echo = FALSE, size = 'scriptsize'}
+trial_stage1 <- as.data.frame(do.call(rbind, lapply(unique(trial$id),
+  function(i){
+    fit <- lm(ADAS11 ~ month,
+      data = trial_obs, subset = id == i)
+    c(id = i, beta = fit$coef, sigma = summary(fit)$sigma)
+})))
+trial_stage1 <- right_join(trial_stage1,
+  filter(trial, month == 0) %>% 
+    select(id, active, group, age_c, female))
+head(trial_stage1)
+```
+
+???
+
+NAs are from too few observations due to missing data
+
+---
+
+# Stage 1 model of simulated trial
+
+```{r size = 'scriptsize'}
+summary(lm(ADAS11 ~ month, data = trial_obs, subset = id == 1))
+```
+
+---
+
+# Stage 2 model of simulated trial
+
+```{r trial_plot_stage2}
+ggplot(trial_stage1,
+  aes(x=group, y=beta.month, group = group, color = group)) +
+  geom_boxplot(alpha = 0.25) + 
+  ylab('ADAS11 change per month')
+```
+
+---
+
+# Stage 2 model of simulated trial
+
+```{r trial_stage2_fit}
+summary(lm(beta.month ~ female + age_c + active, data = trial_stage1))
+```
+
+---
+
+# Two-stage models
+
+* In contrast to ANCOVA and $t$-test, two-stage models allow all randomized subject with at least one followup to be included into analysis ("modified intention-to-treat")
+* However, second stage models ignore the variability/uncertainty of the slope estimates from the first stage
+* This means that $p$-values from second stage might be smaller than they should be and Type I error could be inflated
+
+```{r}
+save(trial, trial_obs, trial_wide, trial_mmrm, attrition_rate, n, 
+  Beta, countTab, summaryTable,  file='simulated-trial.Rdata')
+```
 
 ---
 
 # References
 
-```{r refs, echo=FALSE, results="asis", purltt=FALSE}
+```{r refs, echo=FALSE, results="asis", purl=FALSE}
 BibOptions(check.entries = FALSE,
   bib.style = "authoryear",
   cite.style = "authoryear",
@@ -678,5 +1208,13 @@ BibOptions(check.entries = FALSE,
   hyperlink = FALSE,
   dashed = FALSE,
   max.names = 10)
-PrintBibliography(bib)
+PrintBibliography(bib, start=1, end=6)
+```
+
+---
+
+# References
+
+```{r echo=FALSE, results="asis", purl=FALSE}
+PrintBibliography(bib, start=7)
 ```
