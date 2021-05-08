@@ -1192,8 +1192,9 @@ summary(lm(beta.month ~ female + age_c + active, data = trial_stage1))
 * This means that $p$-values from second stage might be smaller than they should be and Type I error could be inflated
 
 ```{r}
-save(trial, trial_obs, trial_wide, trial_mmrm, attrition_rate, n, 
-  Beta, countTab, summaryTable,  file='simulated-trial.Rdata')
+save(trial, trial_obs, trial_wide, trial_mmrm, 
+  months, attrition_rate, n, 
+  Beta, countTab, summaryTable, file='simulated-trial.Rdata')
 ```
 
 ---
