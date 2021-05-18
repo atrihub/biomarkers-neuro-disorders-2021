@@ -110,7 +110,8 @@ BibOptions(check.entries = FALSE,
   dashed = FALSE,
   max.names = 1)
 bib <- ReadBib("./references.bib", check = FALSE)
-NoCite(bib, c('properzi2019nonlinear', 'rowe201718', 'klunk2015centiloid', 'navitsky2018standardization', 'li2019bayesian'))
+NoCite(bib, c('properzi2019nonlinear', 'rowe201718', 'klunk2015centiloid', 
+  'navitsky2018standardization', 'royse2021validation', 'li2019bayesian'))
 # Citet(), Citep(), AutoCite()
 ```
 
@@ -454,7 +455,7 @@ invproptab <- 1/with(dd, prop.table(table(DX, Tracer), margin = 2))
 kable(invproptab)
 ```
 
-??? 
+???
 
 similar methodology underlies CDC growth charts that provide height and weight 
 percentiles per age 
@@ -621,7 +622,7 @@ knitr::include_graphics("./images/li2019.png")
 
 ---
 
-# Validation on a holdout set with PiB and Florbetapir scans
+# Validation on a holdout set with both tracers (FBB $\rightarrow$ PiB)
 
 ```{r }
 dd.validate <- full_join(
@@ -642,6 +643,10 @@ dd.validate <- full_join(
   ) %>%
   mutate(
     `Years between scans` = as.numeric(EXAMDATE.Fbp - EXAMDATE.PiB)/365.25,
+    `Royse et al linear map of PiB to Florbetapir` = 
+      as.numeric(0.497 * PiB + 0.503),
+    `Royse et al linear map of Florbetapir to PiB` = 
+      as.numeric((Florbetapir - 0.503)/0.497),
     `Navitsky et al linear map of PiB to Florbetapir` = 
       as.numeric(0.536 * PiB + 0.502),
     `Navitsky et al linear map of Florbetapir to PiB` = 
@@ -650,7 +655,7 @@ dd.validate <- full_join(
     `ECDF map of PiB to Florbetapir` = Fbp.inv.ecdf(PiB.ecdf(PiB))
   )
 
-dd.validate %>%
+fbb2pib_navitsky <- dd.validate %>%
   select(RID, `Years between scans`, PiB, 
     `Navitsky et al linear map of Florbetapir to PiB`,
     `ECDF map of Florbetapir to PiB`) %>%
@@ -658,28 +663,40 @@ dd.validate %>%
     `Navitsky et al linear map*` = `Navitsky et al linear map of Florbetapir to PiB`,
     `ECDF map` = `ECDF map of Florbetapir to PiB`) %>%
   pivot_longer(c('Navitsky et al linear map*', 'ECDF map'), 
-    names_to = 'Method', values_to = 'Estimated PiB SUVR') %>%
-ggplot(aes(x=PiB, y=`Estimated PiB SUVR`)) +
+    names_to = 'Method', values_to = 'Estimated PiB SUVR')
+
+fbb2pib_navitsky_RMSE <- fbb2pib_navitsky %>% group_by(Method) %>%
+  summarise(RMSE = sqrt(mean((PiB-`Estimated PiB SUVR`)^2))) %>%
+  mutate(PiB = 2, `Estimated PiB SUVR` = 0.75,
+    text = paste0('RMSE=', round(RMSE, digits=3)))
+
+ggplot(fbb2pib_navitsky, aes(x=PiB, y=`Estimated PiB SUVR`)) +
   geom_point(aes(color=`Years between scans`)) +
   geom_abline(intercept = 0, slope=1) +
   facet_grid(.~Method) +
-  xlab('Actual PiB SUVR')
+  xlab('Actual PiB SUVR') +
+  geom_text(data=fbb2pib_navitsky_RMSE, aes(label=text)) +
+  geom_hline(yintercept = 1.5, linetype='dashed') +
+  geom_vline(xintercept = 1.5, linetype='dashed')
 ```
 
 $^*$ Using PiB = (Florbetapir - 0.502)/0.536 from `r Citet(bib=bib, 'navitsky2018standardization')`
 
 ???
 
+We held out a random sample of 10 participants with both PiB and FBB
+
 Note that the linear mapping from Navitsky is estimating PiB values outside of 
-the observed range of actual PiB values (near 0.75). This will never happen with
-ECDF mapping.
+the observed range of actual PiB values (near 0.75). 
+
+This will never happen with ECDF mapping.
 
 ---
 
-# Validation on a holdout set with PiB and Florbetapir scans
+# Validation on a holdout set with both tracers (PiB $\rightarrow$ FBB)
 
 ```{r }
-dd.validate %>%
+pib2fbb_navitsky <- dd.validate %>%
   select(RID, `Years between scans`, Florbetapir, 
     `Navitsky et al linear map of PiB to Florbetapir`,
     `ECDF map of PiB to Florbetapir`) %>%
@@ -687,12 +704,21 @@ dd.validate %>%
     `Navitsky et al linear map*` = `Navitsky et al linear map of PiB to Florbetapir`,
     `ECDF map` = `ECDF map of PiB to Florbetapir`) %>%
   pivot_longer(c('Navitsky et al linear map*', 'ECDF map'), 
-    names_to = 'Method', values_to = 'Estimated Florbetapir SUVR') %>%
-ggplot(aes(x=Florbetapir, y=`Estimated Florbetapir SUVR`)) +
+    names_to = 'Method', values_to = 'Estimated Florbetapir SUVR')
+
+pib2fbb_navitsky_RMSE <- pib2fbb_navitsky %>% group_by(Method) %>%
+  summarise(RMSE = sqrt(mean((Florbetapir-`Estimated Florbetapir SUVR`)^2))) %>%
+  mutate(Florbetapir = 1.5, `Estimated Florbetapir SUVR` = 0.75,
+    text = paste0('RMSE=', round(RMSE, digits=3)))
+
+ggplot(pib2fbb_navitsky, aes(x=Florbetapir, y=`Estimated Florbetapir SUVR`)) +
   geom_point(aes(color=`Years between scans`)) +
   geom_abline(intercept = 0, slope=1) +
   facet_grid(.~Method) +
-  xlab('Actual Florbetapir SUVR')
+  xlab('Actual Florbetapir SUVR') +
+  geom_text(data=pib2fbb_navitsky_RMSE, aes(label=text)) +
+  geom_hline(yintercept = 1.11, linetype='dashed') +
+  geom_vline(xintercept = 1.11, linetype='dashed')
 ```
 
 $^*$ Using Florbetapir = PiB $\times$ 0.536 + 0.502 from `r Citet(bib=bib, 'navitsky2018standardization')`
@@ -700,6 +726,98 @@ $^*$ Using Florbetapir = PiB $\times$ 0.536 + 0.502 from `r Citet(bib=bib, 'navi
 ???
 
 This type of approach could also be useful for standardizing fluid assays
+
+---
+
+# Validation on a holdout set with both tracers (FBB $\rightarrow$ PiB)
+
+```{r }
+fbb2pib_royse <- dd.validate %>%
+  select(RID, `Years between scans`, PiB, 
+    `Royse et al linear map of Florbetapir to PiB`,
+    `ECDF map of Florbetapir to PiB`) %>%
+  rename(
+    `Royse et al linear map*` = `Royse et al linear map of Florbetapir to PiB`,
+    `ECDF map` = `ECDF map of Florbetapir to PiB`) %>%
+  pivot_longer(c('Royse et al linear map*', 'ECDF map'), 
+    names_to = 'Method', values_to = 'Estimated PiB SUVR')
+
+fbb2pib_royse_RMSE <- fbb2pib_royse %>% group_by(Method) %>%
+  summarise(RMSE = sqrt(mean((PiB-`Estimated PiB SUVR`)^2))) %>%
+  mutate(PiB = 2, `Estimated PiB SUVR` = 0.75,
+    text = paste0('RMSE=', round(RMSE, digits=3)))
+
+ggplot(fbb2pib_royse, aes(x=PiB, y=`Estimated PiB SUVR`)) +
+  geom_point(aes(color=`Years between scans`)) +
+  geom_abline(intercept = 0, slope=1) +
+  facet_grid(.~Method) +
+  xlab('Actual PiB SUVR') +
+  geom_text(data=fbb2pib_royse_RMSE, aes(label=text)) +
+  geom_hline(yintercept = 1.5, linetype='dashed') +
+  geom_vline(xintercept = 1.5, linetype='dashed')
+```
+
+$^*$ Using PiB = (Florbetapir - 0.503)/0.497 from `r Citet(bib=bib, 'royse2021validation')`
+
+???
+
+---
+
+# Validation on a holdout set with both tracers (PiB $\rightarrow$ FBB)
+
+```{r }
+pib2fbb_royse <- dd.validate %>%
+  select(RID, `Years between scans`, Florbetapir, 
+    `Royse et al linear map of PiB to Florbetapir`,
+    `ECDF map of PiB to Florbetapir`) %>%
+  rename(
+    `Royse et al linear map*` = `Royse et al linear map of PiB to Florbetapir`,
+    `ECDF map` = `ECDF map of PiB to Florbetapir`) %>%
+  pivot_longer(c('Royse et al linear map*', 'ECDF map'), 
+    names_to = 'Method', values_to = 'Estimated Florbetapir SUVR')
+
+pib2fbb_royse_RMSE <- pib2fbb_royse %>% group_by(Method) %>%
+  summarise(RMSE = sqrt(mean((Florbetapir-`Estimated Florbetapir SUVR`)^2))) %>%
+  mutate(Florbetapir = 1.5, `Estimated Florbetapir SUVR` = 0.75,
+    text = paste0('RMSE=', round(RMSE, digits=3)))
+
+ggplot(pib2fbb_royse, aes(x=Florbetapir, y=`Estimated Florbetapir SUVR`)) +
+  geom_point(aes(color=`Years between scans`)) +
+  geom_abline(intercept = 0, slope=1) +
+  facet_grid(.~Method) +
+  xlab('Actual Florbetapir SUVR') +
+  geom_text(data=pib2fbb_royse_RMSE, aes(label=text)) +
+  geom_hline(yintercept = 1.11, linetype='dashed') +
+  geom_vline(xintercept = 1.11, linetype='dashed')
+```
+
+$^*$ Using Florbetapir = PiB $\times$ 0.497 + 0.503 from `r Citet(bib=bib, 'royse2021validation')`
+
+???
+
+dashed line is FBP threshold of 1.11
+
+---
+
+# Where is linear map struggling?
+
+.pull-left[
+
+```{r echo=FALSE, fig.align='center', out.width='80%', purl=FALSE}
+knitr::include_graphics("./images/Royse_2021_Fig2.png")
+```
+
+]
+
+.pull-right[
+
+```{r echo=FALSE, fig.align='center', out.width='70%', purl=FALSE}
+knitr::include_graphics("./images/Royse_2021_Fig2_zoom.png")
+```
+
+]
+
+From `r Citet(bib=bib, 'royse2021validation')`
 
 ---
 
