@@ -851,7 +851,7 @@ trial_mmrm <- right_join(
 # The pseudo data snapshot
 
 ```{r }
-head(select(trial_obs, -group, -missing))
+head(select(trial_obs, -group, -missing)) %>% kable()
 ```
 
 ---
@@ -891,7 +891,7 @@ summaryTable <- trial_obs %>%
     upper95 = Hmisc::smean.cl.normal(ADAS11)[['Upper']],
     min=min(ADAS11),
     max=max(ADAS11))
-print(as.data.frame(summaryTable), row.names=FALSE)
+as.data.frame(summaryTable) %>% kable() %>% collapse_rows(1)
 ```
 
 ---
@@ -930,7 +930,7 @@ chsummaryTable <- bind_rows(
   chsummaryTable) %>%
   arrange(group, month)
 
-print(as.data.frame(chsummaryTable), row.names=FALSE)
+as.data.frame(chsummaryTable) %>% kable() %>% collapse_rows(1)
 ```
 
 ---
@@ -1215,7 +1215,7 @@ trial_stage1 <- as.data.frame(do.call(rbind, lapply(unique(trial$id),
 trial_stage1 <- right_join(trial_stage1,
   filter(trial, month == 0) %>% 
     select(id, active, group, age_c, female))
-head(trial_stage1)
+head(trial_stage1) %>% kable()
 ```
 
 ???

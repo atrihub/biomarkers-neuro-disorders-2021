@@ -161,17 +161,17 @@ class: inverse, middle, center
 
 Linear mixed-effects models provide a cleaner, more efficient, and more accurate one-step alternative to two-stage models
 
-Instead of:
-* Stage 1: $\textrm{ADAS}_{ij} = \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_{ij}$
-* Stage 2: $\hat\beta_{1i} = X_i\beta + \varepsilon'_{ij}$
+$$\left. \begin{array}{ll}
+\textrm{Stage 1: } \textrm{ADAS}_{ij} &= \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_{ij}\\
+\textrm{Stage 2: } \hat\beta_{1i} &= X_i\beta + \varepsilon'_{ij}
+  \end{array} \right\} \rightarrow
+  \textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$
 
-We simulatenously estimate both levels:
-$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$
 * $X_i$: covariates for subject $i=1,\ldots,400$
-* $\beta$: population level "_fixed effects_"
-* $b_i \sim \mathcal{N}(0,D)$: subject-specific "_random effects_" for subject $i=1,\ldots,400$
-* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)$: vector of "_residuals_" for subject $i=1,\ldots,400$
-* $D,\, \Sigma$: "_variance components_"
+* $\beta$: population level _fixed effects_
+* $b_i \sim \mathcal{N}(0,D)$: subject-specific _random effects_ for subject $i=1,\ldots,400$
+* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)$: vector of _residuals_ for subject $i=1,\ldots,400$
+* $D,\, \Sigma$: _variance components_
 
 $b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N$ are assumed independent
 
@@ -418,10 +418,10 @@ Abbreviations:
 
 $$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$
 * $X_i$: covariates for subject $i=1,\ldots,400$
-* $\beta$: population level "_fixed effects_"
-* $b_i \sim \mathcal{N}(0,D)$: subject-specific "_random effects_" for subject $i=1,\ldots,400$
-* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)$: vector of "_residuals_" for subject $i=1,\ldots,400$
-* $D,\, \Sigma$: "_variance components_"
+* $\beta$: population level _fixed effects_
+* $b_i \sim \mathcal{N}(0,D)$: subject-specific _random effects_ for subject $i=1,\ldots,400$
+* $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)$: vector of _residuals_ for subject $i=1,\ldots,400$
+* $D,\, \Sigma$: _variance components_
 
 
 $b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N$ are assumed independent
@@ -432,10 +432,10 @@ $b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N$ are assumed independent
 
 $$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$
 
-* "_Mean structure_" (fixed effects): $X_i\beta$
+* _Mean structure_ (fixed effects): $X_i\beta$
     * linear, quadratic, splines, or categorical time; and
     * other fixed-effect covariates (age, education, gender, treatment)
-* "_Variance structure_" (random effects & residuals): $b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$
+* _Variance structure_ (random effects & residuals): $b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$
     * random intercept, random intercept & slope; or
     * impose variance-covariance (variance and correlation) structure on residuals $(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)$
 
@@ -613,7 +613,7 @@ ggplot(filter(varPlot, variance=='heterogeneous'),
 #      visNo = as.numeric(m))
 #
 # with(adni_ad, table(m, visNo))
-# fit_adni <- gls(ADAS11 ~ PTGENDER + scale(AGE, scale=FALSE) + m, data=adni_ad,
+# fit_adni <- gls(ADAS11 ~ PTGENDER + center(AGE) + m, data=adni_ad,
 #   correlation = corSymm(form = ~ visNo | RID),
 #   weights = varIdent(form = ~ 1 | m) )
 # summary(fit_adni)
@@ -622,7 +622,7 @@ ggplot(filter(varPlot, variance=='heterogeneous'),
 
 ---
 
-# Let's simulate categorical time data from a hypothetical clinical trial $\ldots$
+# Simulating categorical time data $\ldots$
 
 These are all estimates required:
 
@@ -649,7 +649,6 @@ vv <- diag(c(1, 1.2, 1.5, 1.8))          # hetergeneous variance weight matrix
 cc <- matrix(0.75, nrow=4, ncol=4)   # correlation matrix
 diag(cc) <- 1
 ```
-
 
 ```{r }
 # set seed so that simulation is reproducible
@@ -708,17 +707,16 @@ trial_mmrm <- right_join(
     visNo = as.numeric(m))
 ```
 
-
 ---
 
 # The pseudo categorical time data
 
 ```{r }
-head(select(trial_mmrm, -group, -missing, -m))
+trial_mmrm %>% select(-group, -missing, -month, -visNo) %>% 
+  select(id, m, m0, m6, m12, m18, everything()) %>%
+  head() %>%
+  kable()
 ```
-}
-
-
 
 ---
 
@@ -729,7 +727,7 @@ ggplot(trial, aes(x=month, y=ADAS11, group=id, color=group)) +
   geom_line(alpha=0.25) +
   geom_smooth(aes(group = NULL), method = 'loess', size = 2) +
   scale_x_continuous(breaks=months, lim=c(0,18)) +
-  theme(legend.position=c(0.1, 0.85))
+  theme(legend.position=c(0.1, 0.85), legend.background = element_rect(fill=NA))
 ```
 
 ---
@@ -748,9 +746,10 @@ MMRMcompSymHet <- gls(ADAS11.ch ~
   -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_mmrm, correlation = corCompSymm(form = ~ visNo | id),
   weights = varIdent(form = ~ 1 | m) )
-
-# see ?corClasses and ?varClasses for more options
 ```
+
+See `?corClasses` and `?varClasses` in `R`; and chapter 5 in `r Citet(bib, 'pinheiro2006mixed')`
+for more details.
 
 ---
 
@@ -784,6 +783,7 @@ cat("Residual standard error:", format(x$sigma),"\n")
 ---
 
 # Fitting cLDA in R
+
 ```{r echo = TRUE}
 # Symmetric correlation, hetergeneous variance
 cLDAsymHet <- gls(ADAS11 ~ 
@@ -796,8 +796,6 @@ cLDAcompSymHet <- gls(ADAS11 ~
   -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_obs, correlation = corCompSymm(form = ~ visNo | id),
   weights = varIdent(form = ~ 1 | m) )
-
-# see ?corClasses and ?varClasses for more options
 ```
 
 ---
@@ -840,7 +838,9 @@ cLDAquad <- gls(ADAS11 ~
   female + age_c + (month + I(month^2)) + (month + I(month^2)):active,
   data=trial_obs, correlation = corSymm(form = ~ visNo | id),
   weights = varIdent(form = ~ 1 | m))
+```
 
+```{r echo = FALSE}
 # Natural cubic spline
 b1 <- function(t){
   as.numeric(predict(splines::ns(trial_obs$month, df=2), t)[,1])
@@ -901,16 +901,14 @@ summaryTable <- trial_obs %>%
     max=max(ADAS11))
 countTab <- ggplot(summaryTable, aes(x=month, y=group, label=n)) + geom_text() + theme_table()
 
-p <- ggplot(plotData, aes(x = month, y = Estimate))+
+ggplot(plotData, aes(x = month, y = Estimate))+
   geom_line(aes(color=group, linetype=model), position=position_dodge(width=2)) +
   geom_point(aes(color=group, shape=model), position=position_dodge(width=2)) +
   ylim(c(15,30)) +
   scale_x_continuous(breaks=months) +
   ylab('Mean ADAS (95% CI)') +
   theme(legend.position='top')
-grid.draw(arrangeGrob(p,countTab,heights=c(3,1)))
 ```
-
 
 ```{r }
 contrastData0 <- filter(trial_obs, !duplicated(paste(month, active))) %>%
@@ -937,7 +935,93 @@ rownames(contrastMatrix_quad) <- rownames(contrastMatrix_cat) <-
 
 ---
 
-# Modeled group contrasts for categorical, quadratic, and natrual cubic spline models
+# cLDA with Natural Cubic Splines
+
+.pull-leftWider[
+
+```{r }
+plotData %>%
+  filter(model == 'natural cubic splines') %>%
+  ggplot(aes(x = month, y = Estimate))+
+  geom_line(aes(color=group)) +
+  geom_point(aes(color=group)) +
+  ylim(c(15,30)) +
+  scale_x_continuous(breaks=months) +
+  ylab('Mean ADAS (95% CI)') +
+  theme(legend.position='top')
+```
+
+]
+
+.pull-rightNarrower[
+
+
+Natural Cubic Spline `r Citep(bib=bib, 'schoenberg1964spline')`:
+
++ Group 1 mean at $t$: $f_1(t)$
+
++ Group 2 mean at $t$: $f_2(t)$
+
++ $f_1$ and $f_2$ are two smooth functions
+
+  + cubic basis functions
+
+  + "natural" implies second derivatives are zero at boundaries
+
+]
+
+???
+
+This model uses natural cubic splines to model the mean in each group. In this case we assume:
+
+- cubic spline basis functions,  
+- just one interior knot, and
+- second derivatives are fix at 0 on the boundaries.
+
+This constraint helps to avoids spurious flips of the curves near the last observations.
+
+---
+
+# Natural Cubic Splines (df=2)
+
+Assumes the smooth functions for the mean in each group can each be expressed:
+
+$$ f(t) = b_1(t)\beta_1 + b_2(t)\beta_2 $$
+where 
+
+- $b$s are *known functions* (cubic polynomials) that depend only on "knot" locations (t=0, median observation time, and last observation time). 
+
+- $\beta$s are unknown fixed effect regression coefficients estimated as usual by `gls` or `PROC MIXED`
+
+- resulting $f$ has second derivative of 0 at t=0 and last observation time.
+
+Fit in `R`, using `nlme::gls`:
+
+```{r eval=FALSE, echo=TRUE}
+gls(ADAS11 ~  female + age_c +   # bl covs
+    ns(months, df=2) +        # natural spline for placebo (1 knot)
+    ns(months, df=2):active + # natural spline for active (1 knot)
+  correlation = corSymm(form = ~ visNo | id), # general correlation
+  weights = varIdent(form = ~ 1 | visNo))     # heterogeneous variance
+```
+
+???
+
+And once we have the basis expansion, this is also just a linear model which can 
+be fit with gls.
+
+One downside is that we have to pre-specify the number and location of spline knots.
+
+Inference could be based on a likelihood ratio for the main group effect, or we could
+derive contrasts at any given timepoint.
+
+We are also exploring using time-varying test-version effects, which seems to be an
+efficient way to model the zig-zag mean trajectory we often see due to varying test
+difficulty.
+
+---
+
+## Modeled group contrasts for categorical, quadratic, and natrual cubic spline models
 
 ```{r }
 cts <- bind_rows(
@@ -959,7 +1043,7 @@ ggplot(cts, aes(x=month, y=Estimate, color=model)) +
 
 ---
 
-# Modeled group contrasts for quadratic and categorical time models
+## Modeled group contrasts for quadratic and categorical time models
 
 ```{r }
 summary(glht(cLDAsymHet, linfct = as.matrix(contrastMatrix_cat)))
@@ -976,21 +1060,28 @@ summary(glht(cLDAsymHet, linfct = as.matrix(contrastMatrix_cat)))
 |                        |                      | or random effects    |  or random effects   |
 |**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
 |                        |                      | different means      |  common mean         | 
-|                        |                      | per group            |  per group           | 
+|                        |                      | per group            |  per group           |
 
-Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA; cat., categorical; cts., continuous.
+Abbreviations: 
+
+* MMRM: Mixed Model of Repeated Measures
+* LDA: Longitudinal Data Analysis
+* cLDA: Constrained LDA
+* cat.: categorical
+* cts.: continuous
 
 ---
 
 # MMRM vs cLDA
 
 * Both (can use) categorical time
-* _MMRM_ has _change from baseline_ as outcome, baseline assessment as covariate
-  *[$\rightarrow$] need follow-up data to calculate change
-  *[$\rightarrow$] modified Intention-to-Treat (mITT) population (i.e. randomized and at least one follow-up assessment)
-* _cLDA_ uses raw assessment scores as outcome; baseline assessment as outcome, constrains two groups to have same mean
-  *[$\rightarrow$] only need one observation to enter into analysis
-  *[$\rightarrow$] "_unmodified_" Intention-to-Treat population (i.e. randomized with at least one assessment)
+* **MMRM** has _change from baseline_ as outcome, baseline assessment as covariate
+  * need follow-up data to calculate change
+  * modified Intention-to-Treat (mITT) population (i.e. randomized and at least one follow-up assessment)
+* **cLDA** uses raw assessment scores as outcome; baseline assessment as outcome, constrains two groups to have same mean
+  * only need one observation to enter into analysis
+  * _unmodified_ Intention-to-Treat population (i.e. randomized with at least one assessment)
+  * baseline mean constraint really only appropriate in randomized studies
 * In our simulated trial it is a difference of $n=46$ subjects
 
 Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA.
@@ -1001,10 +1092,12 @@ Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data An
 
 From `r Citet(bib, 'lu2010efficiency')`:
 
-* cLDA more powerful than MMRM (aka ``longitudinal ANCOVA'') when baseline assessments are missing
+* (categorical time) cLDA more powerful than MMRM (aka "longitudinal ANCOVA") when baseline assessments are missing
 * cLDA advantage is greater when correlation between baseline and follow-up is weaker
 
 Caveat: Implicitly assumes data Missing at Random.
+
+In simulations of Preclinical Alzheimer's clinical trials, we have found power can increase from 80% with MMRM to about 90% with continuous-time cLDA.
 
 ---
 
@@ -1019,24 +1112,21 @@ class: inverse, middle, center
 * Measurement: $Y_{ij}$ (e.g. $\textrm{ADAS}_{ij}$)
 * Covariates: $X_{i}$ (e.g. treatment, gender, age, \ldots)
 * Missingness indicator:
-    \begin{displaymath}
-     R_{ij} = \left\{
+    
+$$R_{ij} = \left\{
      \begin{array}{l}
-       1 \textrm{ if }Y_{ij}\textrm{ is observed}
+       1 \textrm{ if }Y_{ij}\textrm{ is observed}\\
        0 \textrm{ otherwise}
-      \end{array} \right.
-    \end{displaymath}
+      \end{array} \right.$$
+      
 * Let $\mathbf{Y}_i = (Y_{i1},\ldots,Y_{in_i})' = (\mathbf{Y}_i^o, \mathbf{Y}_i^m)$, where
-     \begin{displaymath}
-     \left\{
-     \begin{array}{l}
-       \mathbf{Y}_i^o \textrm{ observed }Y_{ij}
-       \mathbf{Y}_i^m \textrm{ un-observed }Y_{ij}
-      \end{array} \right.
-    \end{displaymath}
+
+$$\mathbf{Y}_i^o \textrm{ observed }Y_{ij}$$
+$$\mathbf{Y}_i^m \textrm{ un-observed }Y_{ij}$$
+
 * $D_i$ is time of dropout
-* $\theta$ parameters that control $\mathbf{Y}_i$ (e.g. effects for treatment, gender, age, \ldots)
-* $\psi$ parameters that control $\mathbf{R}_i$ (e.g. treatment effect, $\mathbf{Y}_i^m$, \dots)
+* $\theta$ parameters that control $\mathbf{Y}_i$ (e.g. effects for treatment, gender, age, $\ldots$)
+* $\psi$ parameters that control $\mathbf{R}_i$ (e.g. treatment effect, $\mathbf{Y}_i^m$, $\ldots$)
 
 The notation is supposed to be a helpful shorthand. If it's not helpful, don't worry about it!
 
@@ -1044,44 +1134,24 @@ The notation is supposed to be a helpful shorthand. If it's not helpful, don't w
 
 # Taxonomy of missing data mechanism
 
-Missing data mechanisms are defined in terms of the assumed distribution function, $F$, or ``data generating mechanism,'' for the missingness indicator $R_i$
+Missing data mechanisms are defined in terms of the assumed distribution function, $F$, or "data generating mechanism," for the missingness indicator $R_i$
 
-\bigskip
-\begin{tabular}{lll}
-% Full joint distribution &
-%   $(\mathbf{Y}_i, \mathbf{R}_i) \sim F(X_i, \theta, \psi)$
-\hline
-\hline
-Term & Notation & Missingness depends on:
-\hline
-\rowcolor[gray]{.9} 
-  Missing **Completely} at Random & 
-  $\mathbf{R}_i \sim F(X_i, \psi)$ &
-  covariates
-Missing at Random & 
-  $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$ &
-  covariates
-  && observed assessments
-\rowcolor[gray]{.9}
-Missing **Not} at Random & 
-\rowcolor[gray]{.9}
-  $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$ &
-  covariates
-\rowcolor[gray]{.9}
-  && observed assessments
-\rowcolor[gray]{.9}
-  && **unobserved} assessments
-\hline
-\end{tabular}
-\bigskip
 
-We'll unpack these a bit \ldots
+| Term | Notation | Missingness depends on: |
+|------|----------|-------------------------|
+| Missing **Completely** at Random | $\mathbf{R}_i \sim F(X_i, \psi)$ | covariates |
+| Missing at Random | $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$ | covariates & observed assessments|
+| Missing **Not** at Random | $\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$ | covariates, observed assessments, **unobserved** assessments |
+
+We'll unpack these a bit $\ldots$
 
 ---
 
-# Missing _Completely} at Random (MCAR)
+# Missing _Completely_ at Random (MCAR)
 
-$\mathbf{R}_i \sim F(X_i, \psi)$: Missingness (may) depend only on observed covariates ($X_i$)
+.large[
+
+$\mathbf{R}_i \sim F(X_i, \psi)$: Missingness (may) depend only on observed covariates ( $X_i$)
 
 Appropriate methods:
 
@@ -1089,51 +1159,43 @@ Appropriate methods:
 * Last Observation Carried Forward (LOCF) (?)
 * Single imputation (?)
 
-
-
+]
 
 ---
 
 # Missing at Random (MAR)
-$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$: Missingness (may) depend on observed covariates ($X_i$) and/or observed outcomes ($\mathbf{Y}_i^o$)
+
+.large[
+
+$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)$: Missingness (may) depend on observed covariates ( $X_i$) and/or observed outcomes ( $\mathbf{Y}_i^o$)
 
 Appropriate methods:
 
-* **Direct likelihood (e.g. mixed-effects models, MMRM, cLDA)!},
+* **Direct likelihood (e.g. mixed-effects models, MMRM, cLDA)!**,
 * Multiple imputation
 * Weighted generalized estimating equations (WGEE)
 
-
-
+]
 
 ---
 
-# Missing _Not} at Random (MNAR)
-$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$: Missingness (may) depend on observed covariates ($X_i$), observed outcomes ($\mathbf{Y}_i^o$), and unobserved outcomes ($\mathbf{Y}_i^m$)
+# Missing _Not_ at Random (MNAR)
+
+.large[
+
+$\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$: Missingness (may) depend on observed covariates ( $X_i$), observed outcomes ( $\mathbf{Y}_i^o$), and unobserved outcomes ( $\mathbf{Y}_i^m$)
 
 Appropriate sensitivity analyses (?):
 
 * selection models: $f(\mathbf{Y}_i|X_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)$
-* pattern-mixture models (e.g. ``tipping point'' stress test): $f(\mathbf{Y}_i|X_i, \mathbf{R}_i, \theta)f(\mathbf{R}_i|X_i, \psi)$
+* pattern-mixture models (e.g. "tipping point" stress test): $f(\mathbf{Y}_i|X_i, \mathbf{R}_i, \theta)f(\mathbf{R}_i|X_i, \psi)$
 * shared-parameter models: $f(\mathbf{Y}_i|X_i, \mathbf{b}_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{b}_i, \psi)$
-
 
 All of these approaches make untestable assumptions about missingness.
 
 We can never completely rule out MNAR, since, if it exists, it depends on variables that we do _not} observe.
 
-
-
----
-
-# Quiz
-MCAR, MAR, or MNAR?
-
-* Missingness at month 18 only depends on treatment assignment.
-* Missingness at month 18 only depends on treatment assignment and
-    ADAS at month 12.
-* Missingness at month 18 only depends on treatment assignment and
-    ADAS at month 18.
+]
 
 ---
 
@@ -1143,8 +1205,7 @@ MCAR, MAR, or MNAR?
 * _Missing Completely At Random_ is an unrealistic and unnecessary assumption.
 * _Missing at Random_ is a more reasonable assumption, and we have reliable methods that are robust in this case.
 
-Direct likelihood (mixed-effects) is recommended. Complete case (ANCOVA), LOCF, and single imputation should be _avoided}.
-
+Direct likelihood (mixed-effects) is recommended. Complete case (ANCOVA), LOCF, and single imputation should be _avoided_.
 
 ---
 
@@ -1152,10 +1213,12 @@ class: inverse, middle, center
 
 # Multiple Imputation
 
-
 ---
 
 # Multiple imputation (MI)
+
+.large[
+
 Basic steps:
 
 * Create multiple complete versions of the data with imputed plausible values
@@ -1164,11 +1227,11 @@ Basic steps:
 
 Comments:
 
-* MI requires many more modeling decisions than direct likelihood methods (e.g. number of imputations, imputation methods, \ldots)
+* MI requires many more modeling decisions than direct likelihood methods (e.g. number of imputations, imputation methods, $\ldots$)
 * CAUTION: Lots of nuance and complexity
 * Usually reserved for _sensitivity analyses_
 
-
+]
 
 ```{r results = 'hide', echo = FALSE}
 # get default predictor matrix
@@ -1180,42 +1243,40 @@ predictorMatrix['ADAS11.m6', 'ADAS11.m12'] <- 0
 predictorMatrix['ADAS11.m6', 'ADAS11.m18'] <- 0
 ```
 
-
 ---
 
 # 1. Create multiple complete versions
+
 ```{r results = 'hide', echo = TRUE}
 trial_imp <- mice(trial_wide, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100)
 ```
+
 ```{r echo = TRUE, size = 'scriptsize'}
 head(trial_wide)    # raw data with missing values:
 head(complete(trial_imp)) # first complete version:
 ```
 
-
-
 ---
 
 # 2. Analyze each complete version
+
 ```{r echo = FALSE, size = 'scriptsize'}
-fits_mi <- with(data=trial_imp, lm(ADAS11.m18~active*scale(ADAS11.m0, scale = FALSE)))
+fits_mi <- with(data=trial_imp, lm(ADAS11.m18~active*center(ADAS11.m0)))
 summary(fits_mi)
 ```
-
-
 
 ---
 
 # 3. Combine the results
+
 ```{r echo = FALSE}
 printCoefmat(summary(pool(fits_mi))[,1:5],eps=0.001,digits=3)
 ```
 
-
-
 ---
 
 # "Tipping point" MNAR stress test
+
 ```{r }
 post <- trial_imp$post
 k_tipping <- seq(1, 2.5, 0.25)
@@ -1226,18 +1287,18 @@ for (k in 1:length(k_tipping)){
   # (nullify the imputed treatment effect to varying degrees)
   post["ADAS11.m18"] <- paste("imp[[j]][,i] <- imp[[j]][,i] + ", k_tipping[k], "* 4.0 * p$data$active[!r[,j]]")
   imp_k <- mice(trial_wide, post=post, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100, print = FALSE)
-  fit_k <- with(imp_k, lm(ADAS11.m18~active*scale(ADAS11.m0, scale=FALSE)))
+  fit_k <- with(imp_k, lm(ADAS11.m18~active*center(ADAS11.m0)))
   est_tipping[[k]] <- summary(pool(fit_k))['active', 1:5]
 }
 ```
+
 Treatment effects for different MNAR factors:
+
 ```{r echo=FALSE}
 results_tipping <- do.call(rbind, est_tipping)
 results_tipping <- cbind(tipping_factor = k_tipping, results_tipping)
 printCoefmat(results_tipping, eps=0.001, digits=3)
 ```
-
-
 
 ---
 
@@ -1247,6 +1308,7 @@ printCoefmat(results_tipping, eps=0.001, digits=3)
 imputed_ids <- subset(trial_wide, is.na(ADAS11.m18))[1:5,]$id
 # filter(trial_wide, id %in% imputed_ids)
 ```
+
 Imputed ADAS.m18 assuming under MAR 
 
 ```{r }
@@ -1255,72 +1317,13 @@ filter(complete(trial_imp), id %in% imputed_ids) %>%
   select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
 ```
 
-Imputed ADAS.m18 assuming under MNAR ($k$=`r k_tipping[k]`, $k\times 4=$`r k_tipping[k] * 4.0` ADAS points)
+Imputed ADAS.m18 assuming under MNAR ( $k$=`r k_tipping[k]`, $k\times 4=$`r k_tipping[k] * 4.0` ADAS points)
 
 ```{r }
 # Imputation under MNAR (k=0.5)
 filter(complete(imp_k), id %in% imputed_ids) %>%
   select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
 ```
-
----
-
-class: inverse, middle, center
-
-# Estimands
-
----
-
-# Estimands, Estimators, & Estimates
-
-* _Estimand_: Target of estimation 
-    e.g. the treatment effect in ITT population
-* _Estimator_: Rules for estimation
-    e.g. final visit contrast based on MMRM
-* _Estimate_: The number derived from applying estimator to data
-    e.g. -3.42 (SE=1.04) ADAS11 point difference between groups
-
-
-
-
----
-
-# Estimands: Efficacy vs Effectiveness
-
-* _Efficacy, de-jure, per-protocol_: 
-    "an ideal treatment effect that could have been reached if all patients had fully adhered to the treatment"
-* _Effectiveness, de-facto, intention-to-treat_:
-    "the effect seen in practice"
-
-\foot{Akacha, M., Bretz, F., & Ruberg, S. (2017). Estimands in clinical trials–broadening the perspective. _Statistics in Medicine}, 36(1), 5-19.}
-
-
-
----
-
-# EMA draft guidline for AD
-
- > [MMRM] tends to be less robust against a decreasing treatment effect difference after treatment
- discontinuation, which is one reason why in CNS indications the MMRM model often yields effect
- estimates close to those in the subgroup of patients who complete the study as planned. Therefore it is
- difficult to endorse the choice of the MMRM model as a routine approach to the primary analysis
- because of this concern that the results would tend to overestimate the true treatment effect.
-
-
-Committee for Medicinal Products for Human Use (CHMP). Draft guideline on the clinical investigation of 
-medicines for the treatment of Alzheimer's disease and other dementias. European Medicines Agencies. 2016.
-
----
-
-# EMA draft guidline for AD
-
-_The EMA claim_: MMRM provides estimates which are closer to _efficacy/per-protocol_ than _effectiveness/ITT_.
-
-* Theoretically at least, this claim is false if data after treatment discontinuation are included in the model and missingness is MAR
-* Any method robust to MAR (e.g. mixed-effects model, multiple imputation) could have this same problem if data after treatment discontinuation are omitted
-* Any alternative MNAR approach would necessarily make _untestable_ assumptions about missing data
-* Assessing the magnitude of this problem and potential alternative approaches is an active area of research $\ldots$
-* Perhaps we should postone concerns about effectiveness until an efficacious treatment is identified
 
 ---
 
