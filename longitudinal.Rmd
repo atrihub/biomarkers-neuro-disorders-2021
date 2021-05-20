@@ -114,8 +114,7 @@ BibOptions(check.entries = FALSE,
   dashed = FALSE,
   max.names = 1)
 bib <- ReadBib("./references.bib", check = FALSE)
-NoCite(bib, c('fitzmaurice2012applied', 'molenberghs2007missing', 'verbeke2000linear', 'diggle2002analysis', 'mallinckrodt2003assessing', 'pinheiro2006mixed', 'donohue2012mixed', 'little2019statistical', 'buuren2010mice', 'akacha2017estimands', 'european2016draft'
-))
+NoCite(bib, c('fitzmaurice2012applied', 'molenberghs2007missing', 'verbeke2000linear', 'diggle2002analysis', 'mallinckrodt2003assessing', 'pinheiro2006mixed', 'donohue2012mixed', 'little2019statistical', 'buuren2010mice'))
 # Citet(), Citep(), AutoCite()
 ```
 
@@ -144,7 +143,9 @@ knitr::include_graphics("./images/actc_logo.png")
 - Mean & Variance Structure
 - Mixed Model for Repeated Measures (MMRM)
 - Constrained Longitudinal Analysis (cLDA)
-- Model selection strategies 
+- Model selection strategies
+- Nested random effects
+- Crossed random effects
 - Missing Data, MAR, MNAR
 - Multiple Imputation & Delta Method
 ]
@@ -355,10 +356,12 @@ $$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + \varepsilon_i$$
 
 # Random intercepts model
 
+.large[
 ```{r trial_lme_apoe_int, size = 'tiny'}
 fit_lme_int <- update(fit_lme, random = ~1|id)
 summary(fit_lme_int)
 ```
+]
 
 ---
 
@@ -403,6 +406,7 @@ class: inverse, middle, center
 |**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
 |                        |                      | different means      |  common mean         | 
 |                        |                      | per group            |  per group           |
+|**Appropriate use**     | Randomized groups    | Non-randomized groups| Randomized groups    |
 
 Abbreviations: 
 
@@ -449,6 +453,7 @@ class: inverse, middle, center
 
 # Mixed Model of Repeated Measures (MMRM)
 
+.large[
 * A popular _marginal model_, "Mixed Model of Repeated Measures" (MMRM), makes no (or very general) assumptions about the mean and variance/covariance structure.
 * **Unstructured mean:** time is treated as categorical, so no linear (or quadratic, etc.) trend is assumed
 * **Unstructured variance/covariance:** includes parameters for variance at each visit ("heterogeneous") and visit-to-visit correlation
@@ -456,6 +461,7 @@ class: inverse, middle, center
 * MMRM is not actually a mixed-effects model (no random effects)!
 * Usually treats change from baseline as outcome variable, and baseline as covariate (like ANCOVA).
 * Requires categorizing/binning time (this has become problematic for clinical trials interrupted by COVID, for example) 
+]
 
 ---
 
@@ -782,6 +788,12 @@ cat("Residual standard error:", format(x$sigma),"\n")
 
 ---
 
+class: inverse, middle, center
+
+# Constrained Longitudinal Data Analysis (cLDA)
+
+---
+
 # Fitting cLDA in R
 
 ```{r echo = TRUE}
@@ -1061,6 +1073,7 @@ summary(glht(cLDAsymHet, linfct = as.matrix(contrastMatrix_cat)))
 |**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
 |                        |                      | different means      |  common mean         | 
 |                        |                      | per group            |  per group           |
+|**Appropriate use**     | Randomized groups    | Non-randomized groups| Randomized groups    |
 
 Abbreviations: 
 
@@ -1098,6 +1111,191 @@ From `r Citet(bib, 'lu2010efficiency')`:
 Caveat: Implicitly assumes data Missing at Random.
 
 In simulations of Preclinical Alzheimer's clinical trials, we have found power can increase from 80% with MMRM to about 90% with continuous-time cLDA.
+
+---
+
+# Natural Cubic Splines with **test version effect** in ADNI and HABS
+
+```{r echo=FALSE, fig.align='center', out.width='100%', purl=FALSE}
+knitr::include_graphics("./images/modeled-means-1.png")
+```
+
+???
+
+Here are models fit to ADNI (top) and HABS (bottom)
+
+The left panel is MMRM with categorical time
+
+The middle and right panels are from the same natural cubic spline model, but one shows the estimated test version effect and the other hides it.
+
+The test version letters are shown along the bottom of each panel.
+
+HABS had more consistent versioning than ADNI.
+
+You can see that the first time version A re-appears at year 3, both amyloid positive and negative groups bump upward with higher scores.
+
+The spline model with version effect captures this quite nicely and in both cases we get a smooth representation of the trend over time removing the nuisance version effects.
+
+---
+
+class: inverse, middle, center
+
+# Nested random effects
+
+---
+
+# Subjects are (typically) nested within sites
+
+```{r, fig.height=5, fig.width=5*2.2}
+options(digits=5)
+
+hippvol <- ADNIMERGE::adnimerge %>%
+  select(RID, COLPROT, VISCODE, Month.bl, SITE, DX.bl, AGE, PTGENDER, ICV, 
+    FLDSTRENG, FSVERSION, Hippocampus) %>%
+  filter(!is.na(Hippocampus)) %>%
+  arrange(RID, Month.bl) %>%
+  mutate(yrs = Month.bl/12) %>%
+  group_by(RID) %>%
+  fill(ICV, .direction = "downup") %>%
+  mutate(ICV.bl = first(ICV))
+
+ggplot(hippvol, aes(x=yrs, y=Hippocampus, color=SITE, group=RID)) +
+  geom_line(alpha=0.5) +
+  facet_wrap(.~DX.bl, scales = 'free_x') +
+  scale_colour_hue()
+```
+
+---
+
+# Testing for nested random effects
+
+```{r}
+hipp_fit <- lme(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + ICV.bl,
+  hippvol, random = ~yrs|RID)
+
+hipp_fit_site <- lme(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + ICV.bl,
+  hippvol, random = list(SITE = ~ yrs, RID = ~ yrs))
+
+anova(hipp_fit_site, hipp_fit)
+```
+
+---
+
+# Nested random effects
+
+```{r size='tiny'}
+summary(hipp_fit_site)
+```
+
+---
+
+# Crossed (non-nested) random effects (e.g. FreeSurfer version)
+
+```{r}
+hippvol_fs <- hippvol %>% 
+  filter(!is.na(FSVERSION)) %>%
+  filter(!DX.bl %in% c('SMC', 'EMCI')) %>%
+  mutate(DX.bl = factor(DX.bl, levels = c('CN', 'LMCI', 'AD')))
+
+n_crossed <- length(intersect(
+  filter(hippvol_fs, FSVERSION == 'Cross-Sectional FreeSurfer (FreeSurfer Version 4.3)')$RID,
+  filter(hippvol_fs, FSVERSION == 'Cross-Sectional FreeSurfer (5.1)')$RID
+))
+
+ggplot(hippvol_fs, aes(x=yrs, y=Hippocampus, color=FSVERSION, group=RID)) +
+  geom_line(alpha=0.5) +
+  facet_wrap(.~DX.bl, scales = 'free_x')
+```
+
+We see `r n_crossed` subjects with data from both FreeSurfer versions
+
+---
+
+# Testing for crossed random effects
+
+```{r}
+library(lme4)
+hipp_fit_lmer <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) +
+    (yrs | RID), data=hippvol_fs)
+
+hipp_fit_lmer_fs <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) + 
+    FSVERSION + (1 | FSVERSION) + (yrs | RID), data=hippvol_fs)
+
+anova(hipp_fit_lmer, hipp_fit_lmer_fs)
+```
+
+---
+
+# Crossed random effects
+
+```{r}
+summary(hipp_fit_lmer_fs)
+```
+
+---
+
+# Crossed and nested random effects (Site & FreeSurfer)
+
+```{r}
+hipp_fit_lmer_fs_site <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) + 
+    (1 | FSVERSION) + (yrs | SITE/RID), data=hippvol_fs)
+
+anova(hipp_fit_lmer_fs, hipp_fit_lmer_fs_site)
+```
+
+---
+
+# Crossed and nested random effects (Site & FreeSurfer)
+
+.small[
+```{r}
+summary(hipp_fit_lmer_fs_site)
+```
+]
+
+---
+
+# Summary
+
+Longitudinal Data Analysis methods:
+
+.large[
+- Mean structures
+- Variance-covariance structures
+- Mixed Model for Repeated Measures (MMRM)
+- Constrained Longitudinal Analysis (cLDA)
+- Nested random effects
+- Crossed random effects
+]
+
+---
+
+# References (1/2)
+
+```{r refs, echo=FALSE, results="asis", purl=FALSE}
+BibOptions(check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = FALSE,
+  dashed = FALSE,
+  max.names = 10)
+PrintBibliography(bib, start=1, end=8)
+```
+
+---
+
+# References (2/2)
+
+```{r refs2, echo=FALSE, results="asis", purl=FALSE}
+PrintBibliography(bib, start=9)
+```
+
+---
+
+class: inverse, middle, center
+
+# Appendix
 
 ---
 
@@ -1325,17 +1523,3 @@ filter(complete(imp_k), id %in% imputed_ids) %>%
   select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
 ```
 
----
-
-# References
-
-```{r refs, echo=FALSE, results="asis", purltt=FALSE}
-BibOptions(check.entries = FALSE,
-  bib.style = "authoryear",
-  cite.style = "authoryear",
-  style = "markdown",
-  hyperlink = FALSE,
-  dashed = FALSE,
-  max.names = 10)
-PrintBibliography(bib)
-```
