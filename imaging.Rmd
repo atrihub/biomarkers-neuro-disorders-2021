@@ -334,6 +334,7 @@ class: inverse, middle, center
 - 1.009 PiB SUVr (mean in young controls) $\rightarrow$ 0 CL
 - 2.076 PiB SUVr (mean in AD cases) $\rightarrow$ 100 CL
 - For other PiB SUVr values, draw the line from (1.009 SUVr, 0 CL) to (2.076 SUVr, 100 CL)
+- CL = 100 $\times$ (PiB SUVr - 1.009)/1.067 `r Citep(bib=bib, 'klunk2015centiloid')`
 
 ]
 
@@ -519,8 +520,9 @@ dd <- dd %>% mutate(
   `Florbetapir to PiB adjusted SUVR` = case_when(
     Tracer == 'Florbetapir' ~ PiB.inv.ecdf(Fbp.ecdf(SUVR))),
   `PiB to Florbetapir adjusted SUVR` = case_when(
-    Tracer == 'PiB' ~ Fbp.inv.ecdf(PiB.ecdf(SUVR)))
-  ) %>%
+    Tracer == 'PiB' ~ Fbp.inv.ecdf(PiB.ecdf(SUVR))),
+  CL = case_when(
+    Tracer == 'PiB' ~ 100*(SUVR - 1.009)/1.067)) %>%
   arrange(Tracer, SUVR)
 ```
 
@@ -534,6 +536,19 @@ ggplot(dd, aes(x=SUVR)) +
   facet_grid(.~Tracer, scales='free_x') +
   geom_line(aes(x=SUVR, y=`Adjusted cumulative probability`), linetype='dashed') +
   ylab('Cumulative Probability')
+```
+
+* solid line is un-adjusted ECDF; dashed line is ECDF adjusted for sample differences
+
+---
+
+# Centiloids vs ADNI Percentiles
+
+```{r}
+dd %>% filter(Tracer == 'PiB') %>%
+  ggplot(aes(x=CL, y=`Adjusted cumulative probability`)) +
+  geom_line() +
+  geom_point()
 ```
 
 ---
@@ -1155,44 +1170,6 @@ class: inverse, middle, center
 
 ]
 
----
-
-## Ordinary Least Squares: minimizing the sum of squared residuals
-
-```{r regression-movie, fig.show='animate', dev='jpeg'}
-lmfit <- lm(ADAS11.m18 ~ ADAS11.m0, data = trial_wide)
-Fitted <- predict(lmfit)
-
-Coef <- lmfit$coef + c(-3, 0.1)*10
-
-for(i in 1:10){
-  Coef <- Coef + c(3, -0.1)
-  Fitted <- as.matrix(cbind(1, filter(trial_wide, !is.na(ADAS11.m18))['ADAS11.m0'])) %*% Coef
-  RSS <- sum((Fitted - filter(trial_wide, !is.na(ADAS11.m18))['ADAS11.m18'])^2)
-  p <- ggplot(filter(trial_wide, !is.na(ADAS11.m18)), aes(x=ADAS11.m0, y=ADAS11.m18)) + 
-    geom_point() + geom_abline(intercept=Coef[1], slope=Coef[2]) +
-    xlab('ADAS11 at baseline') +
-    ylab('ADAS11 at 18 months') +
-    annotate("text", x = 10, y = 50, label = paste('RSS* =', round(RSS, digits = 0))) + 
-    geom_segment(aes(x=ADAS11.m0, y=ADAS11.m18, 
-      xend=ADAS11.m0, yend=Fitted), alpha=0.25) +
-    coord_cartesian(ylim=c(range(trial_wide$ADAS11.m18, na.rm=TRUE)))
-  print(p)
-}
-
-RSS <- sum(lm(ADAS11.m18 ~ ADAS11.m0, data = filter(trial_wide, !is.na(ADAS11.m18)))$residuals^2)
-p <- ggplot(filter(trial_wide, !is.na(ADAS11.m18)), aes(x=ADAS11.m0, y=ADAS11.m18)) + 
-  geom_point() + geom_smooth(method='lm') +
-  xlab('ADAS11 at baseline') +
-  ylab('ADAS11 at 18 months') +
-  annotate("text", x = 10, y = 50, label = paste('RSS* =', round(RSS, digits = 0))) + 
-  geom_segment(aes(x=ADAS11.m0, y=ADAS11.m18, 
-    xend=ADAS11.m0, yend=Fitted), alpha=0.25) +
-  ylim(range(trial_wide$ADAS11.m18, na.rm=TRUE))
-print(p)
-```
-
-$^*$ RSS = Residual sum of squares, or $\sum_i (\textrm{Observed}_i-\textrm{Fitted}_i)^2$
 ---
 
 # Other types of regression

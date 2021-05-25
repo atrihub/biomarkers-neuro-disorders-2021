@@ -1,4 +1,4 @@
-## ----setup, echo=FALSE, message=FALSE, warning=FALSE------------------------------------------------
+## ----setup, echo=FALSE, message=FALSE, warning=FALSE------------------------------------------------------------
 # devtools::install_url('https://cran.rstudio.com/src/contrib/Archive/calibFit/calibFit_2.1.0.tar.gz')
 # remotes::install_github('atrihub/SRS')
 # For ADNIMERGE, go to http://adni.loni.usc.edu/, https://adni.bitbucket.io/
@@ -7,7 +7,6 @@ library(knitr)
 library(tidyverse)
 library(kableExtra)
 library(gridExtra)
-library(RefManageR)
 library(plotly)
 library(calibFit)
 library(SRS)
@@ -38,15 +37,15 @@ scale_fill_discrete <-
 
 
 
-## ----echo=FALSE, fig.align='center', out.width='57%'------------------------------------------------
+## ----echo=FALSE, fig.align='center', out.width='57%'------------------------------------------------------------
 knitr::include_graphics("./images/atri.png")
 
 
-## ----echo=FALSE, fig.align='center', out.width='47%'------------------------------------------------
+## ----echo=FALSE, fig.align='center', out.width='47%'------------------------------------------------------------
 knitr::include_graphics("./images/actc_logo.png")
 
 
-## ----generate_batch_data----------------------------------------------------------------------------
+## ----generate_batch_data----------------------------------------------------------------------------------------
 # simulated data with batch effects
 set.seed(20200225)
 
@@ -68,13 +67,13 @@ batch_data <-
     Biomarker = ifelse(Biomarker<0, 0, Biomarker))
 
 
-## ----batch_data_plot--------------------------------------------------------------------------------
+## ----batch_data_plot--------------------------------------------------------------------------------------------
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
   geom_dotplot(binaxis='y', stackdir='center', dotsize=0.3, alpha=0.2)
 
 
-## ----batch_data_summaries, results='asis', cache=FALSE----------------------------------------------
+## ----batch_data_summaries, results='asis', cache=FALSE----------------------------------------------------------
 batch_data_sum <- batch_data %>% group_by(batch) %>%
   summarize(
     N=length(Biomarker),
@@ -88,11 +87,11 @@ batch_data_sum %>%
     font_size=18, full_width=FALSE)
 
 
-## ---- echo=TRUE, results='markup'-------------------------------------------------------------------
+## ---- echo=TRUE, results='markup'-------------------------------------------------------------------------------
 anova(lm(Biomarker ~ batch, batch_data))
 
 
-## ----batch_confounds--------------------------------------------------------------------------------
+## ----batch_confounds--------------------------------------------------------------------------------------------
 low_groups <- subset(batch_data_sum, Mean<median(batch_data_sum$Mean))$batch
 batch_data <- batch_data %>%
   mutate(Group = ifelse(batch %in% low_groups, 'A', 'B'))
@@ -102,7 +101,7 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 
 
-## ----batch_randomized-------------------------------------------------------------------------------
+## ----batch_randomized-------------------------------------------------------------------------------------------
 batch_data$Group <- sample(batch_data$Group, size=nrow(batch_data))
 ggplot(batch_data, aes(y=Biomarker, x=batch)) +
   geom_boxplot(outlier.shape=NA) +
@@ -110,7 +109,7 @@ ggplot(batch_data, aes(y=Biomarker, x=batch)) +
     binaxis='y', stackdir='center', dotsize=0.3, alpha=0.5)
 
 
-## ----randomization----------------------------------------------------------------------------------
+## ----randomization----------------------------------------------------------------------------------------------
 data(srs_data)
 # head(srs_data)
 
@@ -186,7 +185,7 @@ for(i in 1:nrow(srs_data)){
 }
 
 
-## ---- results='asis'--------------------------------------------------------------------------------
+## ---- results='asis'--------------------------------------------------------------------------------------------
 tr.assignments <- r.obj@tr.assignments %>%
   mutate(
     Treatment = factor(Treatment, levels = r.obj@expt@treatment.names),
@@ -204,7 +203,7 @@ tr.assignments[1:10, ] %>%
     font_size=18, full_width=FALSE)
 
 
-## ---------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------
 tab <- with(tr.assignments, table(Plate, Age)) %>%
   as.data.frame() %>%
   pivot_wider(names_from='Age', values_from='Freq') %>%
@@ -218,7 +217,7 @@ tab %>%
     font_size=18, full_width=FALSE)
 
 
-## ----calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(2)---------------------------------
+## ----calibFit_fits, out.width='100%', fig.height=4, fig.width=4*(2)---------------------------------------------
 data(HPLC)
 data(ELISA)
 
@@ -249,7 +248,7 @@ p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response)) +
 grid.arrange(p1,p2,nrow=1)
 
 
-## ----calibFit_residuals, out.width='100%', fig.height=4, fig.width=4*(2)----------------------------
+## ----calibFit_residuals, out.width='100%', fig.height=4, fig.width=4*(2)----------------------------------------
 p1 <- ggplot(HPLC, aes(x=Concentration, y=Response-Fitted)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -267,7 +266,36 @@ p2 <- ggplot(ELISA, aes(x=log(Concentration), y=Response-Fitted)) +
 grid.arrange(p1,p2,nrow=1)
 
 
-## ---- calib_fit-------------------------------------------------------------------------------------
+## ----regression-movie, fig.show='animate', dev='jpeg'-----------------------------------------------------------
+set.seed(20210524)
+X <- rnorm(200, mean = 2, sd = 0.5)
+e <- rnorm(200, mean = 0, sd = 0.5)
+Y <-  X*2 + e 
+lmfit <- lm(Y ~ X)
+Fitted <- predict(lmfit)
+
+Coef <- lmfit$coef + c(0, 1)
+
+for(i in 1:5){
+  Coef <- Coef + c(0, -0.21)
+  Fitted <- as.matrix(cbind(1, X)) %*% Coef
+  RSS <- sum((Fitted - X)^2)
+  p <- qplot(x=X, y=Y) + 
+    geom_point() + 
+    geom_abline(intercept=Coef[1], slope=Coef[2]) +
+    annotate("text", x = 1, y = 7, label = paste('RSS* =', round(RSS, digits = 0)))
+  print(p)
+}
+
+RSS <- sum(lmfit$residuals^2)
+p <- qplot(x=X, y=Y) + 
+  geom_point() + 
+  geom_abline(intercept=lmfit$coefficients[1], slope=lmfit$coefficients[2]) +
+  annotate("text", x = 1, y = 7, label = paste('RSS* =', round(RSS, digits = 0)))
+print(p)
+
+
+## ---- calib_fit-------------------------------------------------------------------------------------------------
 cal.fpl <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl"))
 cal.lin.pom <- with(HPLC, calib.fit(Concentration,Response,type="lin.pom"))
 cal.fpl.pom <- with(ELISA, calib.fit(Concentration,Response,type="log.fpl.pom"))
@@ -285,7 +313,7 @@ linpom.res <- cal.lin.pom@residuals*(1/((linpom.fit^theta.lin)*sig.lin))
 fplpom.res <- cal.fpl.pom@residuals*(1/((fplpom.fit^theta.fpl)*sig.fpl))
 
 
-## ----calibFit_pom_residuals, out.width='100%', fig.height=4, fig.width=4*(2)------------------------
+## ----calibFit_pom_residuals, out.width='100%', fig.height=4, fig.width=4*(2)------------------------------------
 p1 <- ggplot(HPLC, aes(x=linpom.fit, y=linpom.res)) +
   geom_point() +
   geom_hline(yintercept = 0) +
@@ -303,7 +331,7 @@ p2 <- ggplot(ELISA, aes(x=fplpom.fit, y=fplpom.res)) +
 grid.arrange(p1,p2,nrow=1)
 
 
-## ----calib_hplc_pom, fig.height=4.5, fig.width=4.5*2------------------------------------------------
+## ----calib_hplc_pom, fig.height=4.5, fig.width=4.5*2------------------------------------------------------------
 par(mfrow=c(1,2))
 ciu <- fitted(linmodel) + summary(linmodel)$sigma*qt(.975,linmodel$df)
 cil <- fitted(linmodel) - summary(linmodel)$sigma*qt(.975,linmodel$df)
@@ -316,7 +344,7 @@ lines(HPLC$Concentration,cil,col="grey",lty=2)
 plot(cal.lin.pom,print=FALSE,main = "HPLC data fit with POM",xlab = "Concentration", ylab = "Response")
 
 
-## ----calib_elisa_pom, fig.height=4.5, fig.width=4.5*2-----------------------------------------------
+## ----calib_elisa_pom, fig.height=4.5, fig.width=4.5*2-----------------------------------------------------------
 par(mfrow=c(1,2))
 #par(mar = c(3.5,3.5,1.5,1.5))
 plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", ylab = "Response")
@@ -325,17 +353,17 @@ plot(cal.fpl,print=FALSE,main = "ELISA fit without POM",xlab = "Concentration", 
 plot(cal.fpl.pom,print=FALSE,main = "ELISA fit with POM",xlab = "Concentration", ylab = "Response")
 
 
-## ----calibrated1, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------
+## ----calibrated1, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------------------
 calib.lin <- calib(cal.lin.pom, HPLC$Response)
 plot(calib.lin, main="HPLC calribated with linear POM")
 
 
-## ----calibrated2, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------
+## ----calibrated2, fig.height=4.5, fig.width=4.5, out.width='100%'-----------------------------------------------
 calib.fpl <- calib(cal.fpl.pom, ELISA$Response)
 plot(calib.fpl, main="ELISA calribated with FPL POM")
 
 
-## ----classification, fig.height=4, fig.width=6------------------------------------------------------
+## ----classification, fig.height=4, fig.width=6------------------------------------------------------------------
 dd <- subset(ADNIMERGE::adnimerge, !is.na(ABETA)) %>%
   arrange(RID, EXAMDATE) %>%
   filter(!duplicated(RID)) %>%
@@ -351,19 +379,19 @@ ggplot(dd, aes(x=ABETA, y=TAU)) +
   theme(legend.position = c(0.80,0.75))
 
 
-## ----classification_no_mci--------------------------------------------------------------------------
+## ----classification_no_mci--------------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00"))
 
 
-## ----ROC_abeta, fig.width=5, fig.height=5-----------------------------------------------------------
+## ----ROC_abeta, fig.width=5, fig.height=5-----------------------------------------------------------------------
 roc_abeta <- roc((DX=='Dementia') ~ ABETA, subset(dd, DX!='MCI'))
 # ggroc(roc_abeta)
 plot(roc_abeta, print.thres="best", print.thres.best.method="youden")
 
 
-## ----ROC_abeta_tau, fig.width=5, fig.height=5-------------------------------------------------------
+## ----ROC_abeta_tau, fig.width=5, fig.height=5-------------------------------------------------------------------
 roc_tau <- roc((DX=='Dementia') ~ TAU, subset(dd, DX!='MCI'))
 roc_tauabeta <- roc((DX=='Dementia') ~ I(TAU/ABETA), subset(dd, DX!='MCI'))
 
@@ -377,19 +405,19 @@ legend("bottomright",
 
 
 
-## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------------------
 roc.test(roc_abeta, roc_tau)
 roc.test(roc_abeta, roc_tauabeta)
 
 
-## ----abeta_tau_scatter_youden, fig.height=2.5, fig.width=3*2----------------------------------------
+## ----abeta_tau_scatter_youden, fig.height=2.5, fig.width=3*2----------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
   geom_abline(intercept = 0, slope=0.394)
 
 
-## ---------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------
 logistic.fit <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU), 
   data = subset(dd, DX!='MCI'), family=binomial)
 summary(logistic.fit)$coef %>%
@@ -399,7 +427,7 @@ summary(logistic.fit)$coef %>%
   kable()
 
 
-## ----logistic_pred_prob-----------------------------------------------------------------------------
+## ----logistic_pred_prob-----------------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=predict(logistic.fit, type='response'))) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
@@ -407,7 +435,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   geom_abline(intercept = 0, slope=0.394)
 
 
-## ----ratio_gradient---------------------------------------------------------------------------------
+## ----ratio_gradient---------------------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=TAU/ABETA)) +
   scale_colour_gradient(low="#0072B2", high="#D55E00") +
@@ -423,7 +451,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   coord_cartesian(xlim=c(200,1700), ylim=c(80,852))
 
 
-## ----ratio_gradient_logistic------------------------------------------------------------------------
+## ----ratio_gradient_logistic------------------------------------------------------------------------------------
 tau_fun <- function(abeta, p){
   # log(p/(1-p)) = y = a + b*abetaz + c*tauz
   # tauz = (y - a - b*abetaz)/c
@@ -451,7 +479,7 @@ ggplot(pd, aes(x=ABETA, y=TAU, color=prob)) +
   coord_cartesian(xlim=c(200,1700), ylim=c(80,852))
 
 
-## ----ROC_logistic, fig.width=5, fig.height=5--------------------------------------------------------
+## ----ROC_logistic, fig.width=5, fig.height=5--------------------------------------------------------------------
 roc_logistic.fit <- roc((DX=='Dementia') ~ predict(logistic.fit, type='response'), subset(dd, DX!='MCI'))
 
 plot(roc_abeta, col='blue')
@@ -464,11 +492,11 @@ legend("bottomright",
 
 
 
-## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------------------
 roc.test(roc_abeta, roc_logistic.fit)
 
 
-## ---------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------
 logistic.fit2 <- glm((DX=='Dementia') ~ scale(ABETA) + scale(TAU) + scale(I(AGE+Years.bl)) + as.factor(APOE4), family=binomial, data = subset(dd, DX!='MCI'))
 summary(logistic.fit2)$coef %>% 
   as_tibble(rownames = NA) %>% 
@@ -477,20 +505,20 @@ summary(logistic.fit2)$coef %>%
   kable()
 
 
-## ---- eval=FALSE------------------------------------------------------------------------------------
+## ---- eval=FALSE------------------------------------------------------------------------------------------------
 roc_logistic.fit2 <- roc((DX=='Dementia') ~ predict(logistic.fit2, type='response'), subset(dd, DX!='MCI'))
 roc.test(roc_abeta, roc_logistic.fit2)
 roc.test(roc_tauabeta, roc_logistic.fit2)
 auc(roc_logistic.fit2); ci(roc_logistic.fit2)
 
 
-## ----tree1, fig.height=4.5, fig.width=5*(2)---------------------------------------------------------
+## ----tree1, fig.height=4.5, fig.width=5*(2)---------------------------------------------------------------------
 tree.fit <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'), 
   controls = ctree_control(maxdepth=2))
 plot(tree.fit)
 
 
-## ----tree2------------------------------------------------------------------------------------------
+## ----tree2------------------------------------------------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) + 
   geom_point(aes(color=DX)) +
   scale_color_manual(values=c("#0072B2", "#D55E00")) +
@@ -501,7 +529,7 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   geom_segment(aes(x = 886, y = 440, xend = 1700, yend = 440))
 
 
-## ----ROC_rf, fig.width=5, fig.height=5--------------------------------------------------------------
+## ----ROC_rf, fig.width=5, fig.height=5--------------------------------------------------------------------------
 tree.fit2 <- ctree((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 rf.fit <- cforest((DX=='Dementia') ~ ABETA + TAU, data = subset(dd, DX!='MCI'))
 roc_tree.fit <- roc((DX=='Dementia') ~ predict(tree.fit2, type='response')[,1], subset(dd, DX!='MCI'))
@@ -519,19 +547,19 @@ legend("bottomright",
     col=c("blue", "orange", "red", "purple", "grey", "black"), lwd=2)
 
 
-## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------
+## ---- echo=FALSE, eval=FALSE------------------------------------------------------------------------------------
 roc.test(roc_abeta, roc_tree.fit)
 roc.test(roc_abeta, roc_rf.fit)
 
 
-## ----density_Abeta, fig.height=2.25, fig.width=3*(2)------------------------------------------------
+## ----density_Abeta, fig.height=2.25, fig.width=3*(2)------------------------------------------------------------
 ggplot(subset(dd, DX!='MCI' & ABETA<1700), aes(x=ABETA)) + 
   geom_histogram(aes(y=..density..), alpha=0.5) +
   geom_density() +
   geom_rug(aes(color=DX))
 
 
-## ---- results='hide', cache=TRUE--------------------------------------------------------------------
+## ---- results='hide', cache=TRUE--------------------------------------------------------------------------------
 #' Plot a Mixture Component
 #' 
 #' @param x Input data
@@ -551,7 +579,7 @@ mvmixmdl <- mvnormalmixEM(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')
 ## number of iterations= 85
 
 
-## ----mixture_distribution_Abeta---------------------------------------------------------------------
+## ----mixture_distribution_Abeta---------------------------------------------------------------------------------
 data.frame(ABETA = mixmdl$x) %>%
   ggplot(aes(x=ABETA)) +
   geom_histogram(aes(y=..density..), alpha=0.5) +
@@ -564,7 +592,7 @@ data.frame(ABETA = mixmdl$x) %>%
   ylab("Density")
 
 
-## ---------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------
 post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>%
   arrange(x) %>% 
   rename(Abeta = x, `Prob. Abnormal` = comp.1, `Prob. Normal` = comp.2)
@@ -574,7 +602,7 @@ post.df %>% filter(Abeta > 1030 & Abeta < 1080) %>% kable()
 # filter(post.df, `Prob. Abnormal` <= `Prob. Normal`)[1,]
 
 
-## ----Bivariate_Density------------------------------------------------------------------------------
+## ----Bivariate_Density------------------------------------------------------------------------------------------
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
   showlegend = FALSE,
@@ -588,7 +616,7 @@ fig <- plot_ly(x = kd$x, y = kd$y, z = kd$z) %>% add_surface() %>% layout(
 htmlwidgets::saveWidget(fig, "bvdensity_csf_tau.html")
 
 
-## ----bv_kernel_density------------------------------------------------------------------------------
+## ----bv_kernel_density------------------------------------------------------------------------------------------
 kd <- with(subset(dd, DX!='MCI' & ABETA<1700)[, c('ABETA', 'TAU')], MASS::kde2d(ABETA, TAU, n = 50))
 kdl <- expand.grid(i=1:50, j=1:50) %>%
   mutate(Abeta=NA, Tau=NA, density=NA)
@@ -603,7 +631,7 @@ ggplot(kdl, aes(Abeta, Tau, z = density)) +
   geom_contour(color='white')
 
 
-## ----mvmix_post_prob, fig.width=5, fig.height=5, out.width='100%'-----------------------------------
+## ----mvmix_post_prob, fig.width=5, fig.height=5, out.width='100%'-----------------------------------------------
 post.df2 <- cbind(mvmixmdl$x, mvmixmdl$posterior) %>% 
   as.data.frame() %>% 
   rename(
@@ -618,12 +646,8 @@ ggplot(post.df2, aes(x=ABETA, y=TAU, color=`Prob. Abnormal`)) +
   theme(legend.position=c(0.85, 0.82))
 
 
-## ----mvmix_density, fig.width=5, fig.height=5, out.width='100%'-------------------------------------
+## ----mvmix_density, fig.width=5, fig.height=5, out.width='100%'-------------------------------------------------
 plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10), 
   marginal = FALSE, whichplots=3, main2='', 
   xlab2='ABETA', ylab2='TAU')
-
-
-## ----refs, echo=FALSE, results="asis"---------------------------------------------------------------
-PrintBibliography(bib)
 

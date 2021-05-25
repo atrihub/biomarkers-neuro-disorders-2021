@@ -537,6 +537,42 @@ where:
 
 If the standard deviation is not actually constant (*heteroscedastic*), estimates might be unreliable.
 
+
+---
+
+## Ordinary Least Squares: minimizing the sum of squared residuals
+
+```{r regression-movie, fig.show='animate', dev='jpeg'}
+set.seed(20210524)
+X <- rnorm(200, mean = 2, sd = 0.5)
+e <- rnorm(200, mean = 0, sd = 0.5)
+Y <-  X*2 + e 
+lmfit <- lm(Y ~ X)
+Fitted <- predict(lmfit)
+
+Coef <- lmfit$coef + c(0, 1)
+
+for(i in 1:5){
+  Coef <- Coef + c(0, -0.21)
+  Fitted <- as.matrix(cbind(1, X)) %*% Coef
+  RSS <- sum((Fitted - X)^2)
+  p <- qplot(x=X, y=Y) + 
+    geom_point() + 
+    geom_abline(intercept=Coef[1], slope=Coef[2]) +
+    annotate("text", x = 1, y = 7, label = paste('RSS* =', round(RSS, digits = 0)))
+  print(p)
+}
+
+RSS <- sum(lmfit$residuals^2)
+p <- qplot(x=X, y=Y) + 
+  geom_point() + 
+  geom_abline(intercept=lmfit$coefficients[1], slope=lmfit$coefficients[2]) +
+  annotate("text", x = 1, y = 7, label = paste('RSS* =', round(RSS, digits = 0)))
+print(p)
+```
+
+$^*$ RSS = Residual sum of squares, or $\sum_i (\textrm{Observed}_i-\textrm{Fitted}_i)^2$
+
 ---
 
 # Modeling Heteroscedastic Errors
@@ -570,7 +606,7 @@ which results in
 
 ???
 
-allowing the variance can depend on the mean.
+allowing the variance to depend on the mean.
 
 ---
 
@@ -783,6 +819,8 @@ Sensitivity is a measure of how well we are detecting positive cases
 
 Specificity is a measure of how well we are detecting controls or negative cases
 
+Youden's index gives equal weight to false positives and false negatives (not necessarily appropriate)
+
 ---
 
 # Comparing ROC Curves
@@ -869,6 +907,10 @@ ggplot(subset(dd, DX!='MCI'), aes(x=ABETA, y=TAU)) +
   labs(color="Pred. prob. of Dementia") +
   geom_abline(intercept = 0, slope=0.394)
 ```
+
+???
+
+line again depicts Youden's cutoff
 
 ---
 
@@ -1237,6 +1279,13 @@ plot(mvmixmdl, density = TRUE, alpha = c(0.01, 0.05, 0.10),
   xlab2='ABETA', ylab2='TAU')
 ```
 ]
+
+???
+
+line on the left is still Youden's cutoff for the ratio
+
+Contours are confidence ellipses at 99%, 95%, and 90% just to help see the shape of the estimated distributions
+
 
 ---
 

@@ -25,10 +25,20 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
 
 - Reference Regions
 - Centiloids
-- Machine Learning
+- Standardization using the Empirical Cumulative Distribution Function (ECDF)
+- Intro to longitudinal data analysis
+  - Summaries and plots
+  - Regression
+  - ANCOVA
+  - Two-stage models
 
 ### Longitudinal Data (18:00-18:50)
 
-- Visualizing longitudinal Data
-- Mixed-effect models
-- Modeling correlated residuals
+- Mixed effect models
+- Mean & Variance Structure
+- Mixed Model for Repeated Measures (MMRM)
+- Constrained Longitudinal Analysis (cLDA)
+- Model selection strategies
+- Nested random effects
+- Missing Data, MAR, MNAR
+- Multiple Imputation & Delta Method

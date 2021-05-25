@@ -49,7 +49,7 @@ library(mvtnorm)
 library(mice)
 library(tidyverse)
 
-options(digits=2)
+options(digits=3)
 
 theme_set(theme_bw())
 
@@ -145,7 +145,6 @@ knitr::include_graphics("./images/actc_logo.png")
 - Constrained Longitudinal Analysis (cLDA)
 - Model selection strategies
 - Nested random effects
-- Crossed random effects
 - Missing Data, MAR, MNAR
 - Multiple Imputation & Delta Method
 ]
@@ -651,7 +650,7 @@ attrition_rate <- 0.40/18 # approx per month
 
 # var-cov parameters
 SD <- 6.77                          # standard deviation scale parameter
-vv <- diag(c(1, 1.2, 1.5, 1.8))          # hetergeneous variance weight matrix
+vv <- diag(c(1, 1.2, 1.5, 1.8))          # heterogeneous variance weight matrix
 cc <- matrix(0.75, nrow=4, ncol=4)   # correlation matrix
 diag(cc) <- 1
 ```
@@ -741,13 +740,13 @@ ggplot(trial, aes(x=month, y=ADAS11, group=id, color=group)) +
 # Fitting MMRM in R
 
 ```{r echo = TRUE}
-# Symmetric correlation, hetergeneous variance
+# Symmetric correlation, heterogeneous variance
 MMRMsymHet <- gls(ADAS11.ch ~ 
   -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_mmrm, correlation = corSymm(form = ~ visNo | id),
   weights = varIdent(form = ~ 1 | m) )
 
-# Compound Symmetric correlation, hetergeneous variance
+# Compound Symmetric correlation, heterogeneous variance
 MMRMcompSymHet <- gls(ADAS11.ch ~ 
   -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_mmrm, correlation = corCompSymm(form = ~ visNo | id),
@@ -797,13 +796,13 @@ class: inverse, middle, center
 # Fitting cLDA in R
 
 ```{r echo = TRUE}
-# Symmetric correlation, hetergeneous variance
+# Symmetric correlation, heterogeneous variance
 cLDAsymHet <- gls(ADAS11 ~ 
   -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_obs, correlation = corSymm(form = ~ visNo | id),
   weights = varIdent(form = ~ 1 | m) )
 
-# Compound Symmetric correlation, hetergeneous variance
+# Compound Symmetric correlation, heterogeneous variance
 cLDAcompSymHet <- gls(ADAS11 ~ 
   -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
   data=trial_obs, correlation = corCompSymm(form = ~ visNo | id),
@@ -1169,7 +1168,7 @@ ggplot(hippvol, aes(x=yrs, y=Hippocampus, color=SITE, group=RID)) +
 
 # Testing for nested random effects
 
-```{r}
+```{r, echo=TRUE}
 hipp_fit <- lme(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + ICV.bl,
   hippvol, random = ~yrs|RID)
 
@@ -1189,83 +1188,18 @@ summary(hipp_fit_site)
 
 ---
 
-# Crossed (non-nested) random effects (e.g. FreeSurfer version)
-
-```{r}
-hippvol_fs <- hippvol %>% 
-  filter(!is.na(FSVERSION)) %>%
-  filter(!DX.bl %in% c('SMC', 'EMCI')) %>%
-  mutate(DX.bl = factor(DX.bl, levels = c('CN', 'LMCI', 'AD')))
-
-n_crossed <- length(intersect(
-  filter(hippvol_fs, FSVERSION == 'Cross-Sectional FreeSurfer (FreeSurfer Version 4.3)')$RID,
-  filter(hippvol_fs, FSVERSION == 'Cross-Sectional FreeSurfer (5.1)')$RID
-))
-
-ggplot(hippvol_fs, aes(x=yrs, y=Hippocampus, color=FSVERSION, group=RID)) +
-  geom_line(alpha=0.5) +
-  facet_wrap(.~DX.bl, scales = 'free_x')
-```
-
-We see `r n_crossed` subjects with data from both FreeSurfer versions
-
----
-
-# Testing for crossed random effects
-
-```{r}
-library(lme4)
-hipp_fit_lmer <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) +
-    (yrs | RID), data=hippvol_fs)
-
-hipp_fit_lmer_fs <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) + 
-    FSVERSION + (1 | FSVERSION) + (yrs | RID), data=hippvol_fs)
-
-anova(hipp_fit_lmer, hipp_fit_lmer_fs)
-```
-
----
-
-# Crossed random effects
-
-```{r}
-summary(hipp_fit_lmer_fs)
-```
-
----
-
-# Crossed and nested random effects (Site & FreeSurfer)
-
-```{r}
-hipp_fit_lmer_fs_site <- lmer(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + scale(ICV.bl) + 
-    (1 | FSVERSION) + (yrs | SITE/RID), data=hippvol_fs)
-
-anova(hipp_fit_lmer_fs, hipp_fit_lmer_fs_site)
-```
-
----
-
-# Crossed and nested random effects (Site & FreeSurfer)
-
-.small[
-```{r}
-summary(hipp_fit_lmer_fs_site)
-```
-]
-
----
-
 # Summary
+
+.large[
 
 Longitudinal Data Analysis methods:
 
-.large[
 - Mean structures
 - Variance-covariance structures
 - Mixed Model for Repeated Measures (MMRM)
 - Constrained Longitudinal Analysis (cLDA)
 - Nested random effects
-- Crossed random effects
+
 ]
 
 ---
@@ -1391,7 +1325,7 @@ Appropriate sensitivity analyses (?):
 
 All of these approaches make untestable assumptions about missingness.
 
-We can never completely rule out MNAR, since, if it exists, it depends on variables that we do _not} observe.
+We can never completely rule out MNAR, since, if it exists, it depends on variables that we do _not_ observe.
 
 ]
 
@@ -1450,8 +1384,8 @@ trial_imp <- mice(trial_wide, predictorMatrix=predictorMatrix, seed = 20170714, 
 ```
 
 ```{r echo = TRUE, size = 'scriptsize'}
-head(trial_wide)    # raw data with missing values:
-head(complete(trial_imp)) # first complete version:
+print(head(trial_wide), digits = 2) # raw data with missing values:
+print(head(complete(trial_imp)), digits = 2) # first complete version:
 ```
 
 ---
@@ -1468,7 +1402,10 @@ summary(fits_mi)
 # 3. Combine the results
 
 ```{r echo = FALSE}
-printCoefmat(summary(pool(fits_mi))[,1:5],eps=0.001,digits=3)
+summary(pool(fits_mi)) %>%
+  remove_rownames() %>%
+  column_to_rownames(var="term") %>%
+  printCoefmat()
 ```
 
 ---
@@ -1477,25 +1414,40 @@ printCoefmat(summary(pool(fits_mi))[,1:5],eps=0.001,digits=3)
 
 ```{r }
 post <- trial_imp$post
-k_tipping <- seq(1, 2.5, 0.25)
-est_tipping <- vector("list", length(k_tipping))
-for (k in 1:length(k_tipping)){
+k_tipping <- seq(0.5, 2, 0.25)
+est_tipping <- lapply(k_tipping, function(tip){
   # increase imputed ADAS11.m18 in the active group by 
   # factor of k x MAR treatment estimate (3.1)
   # (nullify the imputed treatment effect to varying degrees)
-  post["ADAS11.m18"] <- paste("imp[[j]][,i] <- imp[[j]][,i] + ", k_tipping[k], "* 4.0 * p$data$active[!r[,j]]")
+  post["ADAS11.m18"] <- paste0("
+  imp[[j]][data$active[!r[, j]] == 1, i] <- imp[[j]][data$active[!r[, j]] == 1, i] + ", 
+  tip, 
+  " * 4
+  imp[[j]][data$active[!r[, j]] == 0, i] <- imp[[j]][data$active[!r[, j]] == 0, i]
+  ")
   imp_k <- mice(trial_wide, post=post, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100, print = FALSE)
   fit_k <- with(imp_k, lm(ADAS11.m18~active*center(ADAS11.m0)))
-  est_tipping[[k]] <- summary(pool(fit_k))['active', 1:5]
-}
+  bind_cols(tipping_factor = tip, summary(pool(fit_k))) %>%
+    filter(term == 'active') %>%
+    select(-term)
+})
+
+# inspect 4th case
+tip_4 <- k_tipping[4]
+post["ADAS11.m18"] <- paste0("
+  imp[[j]][data$active[!r[, j]] == 1, i] <- imp[[j]][data$active[!r[, j]] == 1, i] + ", 
+  tip_4, " * 4
+  imp[[j]][data$active[!r[, j]] == 0, i] <- imp[[j]][data$active[!r[, j]] == 0, i]
+")
+imp_4 <- mice(trial_wide, post=post, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100, print = FALSE)
+fit_4 <- with(imp_4, lm(ADAS11.m18~active*center(ADAS11.m0)))
 ```
 
 Treatment effects for different MNAR factors:
 
 ```{r echo=FALSE}
-results_tipping <- do.call(rbind, est_tipping)
-results_tipping <- cbind(tipping_factor = k_tipping, results_tipping)
-printCoefmat(results_tipping, eps=0.001, digits=3)
+bind_rows(est_tipping) %>%
+  printCoefmat(digit=4, eps=0.001)
 ```
 
 ---
@@ -1507,7 +1459,7 @@ imputed_ids <- subset(trial_wide, is.na(ADAS11.m18))[1:5,]$id
 # filter(trial_wide, id %in% imputed_ids)
 ```
 
-Imputed ADAS.m18 assuming under MAR 
+Imputed ADAS.m18 under MAR 
 
 ```{r }
 # Imputation assuming under MAR 
@@ -1515,11 +1467,12 @@ filter(complete(trial_imp), id %in% imputed_ids) %>%
   select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
 ```
 
-Imputed ADAS.m18 assuming under MNAR ( $k$=`r k_tipping[k]`, $k\times 4=$`r k_tipping[k] * 4.0` ADAS points)
+Imputed ADAS.m18 under MNAR ( $k$=`r k_tipping[4]`,  $k\times 4=$ `r k_tipping[4] * 4.0` ADAS points)
 
 ```{r }
 # Imputation under MNAR (k=0.5)
-filter(complete(imp_k), id %in% imputed_ids) %>%
+filter(mice::complete(imp_4), id %in% imputed_ids) %>%
   select(id, female, age, group, ADAS11.m0, ADAS11.m6, ADAS11.m12, ADAS11.m18)
 ```
 
+Imputed ADAS11.m18 values are only changed for those in active group

@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Biostatistics for Imaging Biomarkers and Introduction to Longitudinal Data</title>
+    <meta charset="utf-8" />
+    <script src="libs/header-attrs-2.6/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <script src="libs/kePrint-0.0.1/kePrint.js"></script>
+    <link href="libs/lightable-0.0.1/lightable.css" rel="stylesheet" />
+    <link rel="stylesheet" href="css/styles.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+class: middle, center
+
+# Biostatistics for Imaging Biomarkers &amp; Introduction to Longitudinal Data
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+May 26, 2021
+
+
+  
+
+
+
+
+.pull-left[
+
+&lt;img src="./images/atri.png" width="57%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+&lt;img src="./images/actc_logo.png" width="47%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+---
+
+# Session 2 Outline
+
+.large[
+- Reference Regions
+- Centiloids
+- Standardization using the Empirical Cumulative Distribution Function (ECDF)
+- Intro to longitudinal data analysis
+  - Summaries and plots
+  - Regression
+  - ANCOVA
+  - Two-stage models
+]
+
+---
+
+class: inverse, middle, center
+
+# Reference Regions
+
+---
+
+# Reference Regions
+
+.large[
+A common issue with statistical analyses of numeric summaries derived from imaging data is normalization to a reference region. 
+
+Examples:
+
+- Volumetric MRI: regional (e.g. hippocampal) volume relative to IntraCranial Volume (ICV)
+- Amyloid PET: cortical-to-cerebellum Standardized Uptake Value Ratio (SUVr)
+
+(Also an issue in non-imaging data, e.g. ratio of CSF `\(\textrm{A}\beta_{1-42}\)` to `\(\textrm{A}\beta_{1-40}\)`)
+]
+
+---
+
+# Beware the "Ratio Fallacy" and "Spurious Correlation"
+.large[
+&gt; Spurious correlation refers to the correlation between indices that have a common component. A 'per ratio' standard is based on a biological measurement adjusted for some physical measurement by division. Renowned statisticians and biologists (Pearson, Neyman and Tanner) have warned about the problems in interpretation that ratios cause. This warning has been largely ignored. The consequences of using a single ratio as either the dependent or one of the independent variables in a multiple-regression analysis are described. It is shown that the use of ratios in regression analyses can lead to incorrect or misleading inferences. A recommendation is made that the use of ratios in regression analyses be avoided.
+
+Kronmal (1993) "Spurious correlation and the fallacy of the ratio standard revisited". *Journal of the Royal Statistical Society: Series A*.
+
+Examples abound: %ICV, SUVR, BMI, ...
+]
+
+---
+
+# Ratio as Dependent Variable in Regression
+
+
+
+
+```r
+lm_fit1_gender &lt;- lm(I(Hippocampus/ICV*100) ~ PTGENDER, data=dd2)
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; Coefficient &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Estimate &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Std. Error &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; t value &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Pr(&amp;gt;|t|) &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; (Intercept) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.51 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.00 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 129.8 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; &amp;lt;0.001 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; PTGENDERMale &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.03 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -5.4 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; &amp;lt;0.001 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+- Signficant association between Gender and Hippocampal Volume (%ICV)!
+- (This linear model is essential just a two-sample t-test)
+- Model fit to ADNI CN
+
+---
+
+# ICV as Covariate Instead of Denominator
+
+
+```r
+lm_fit2_gender &lt;- lm(Hippocampus ~ ICV + PTGENDER, data=dd2)
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; Coefficient &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Estimate &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Std. Error &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; t value &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Pr(&amp;gt;|t|) &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; (Intercept) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4363 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 433 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.07 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; &amp;lt;0.001 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; ICV &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.60 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; &amp;lt;0.001 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; PTGENDERMale &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 94 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.64 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.52 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+- No association between Gender and Hippocampal Volume ( `\(\text{mm}^3\)` )!
+- The **spurious association** in first model is driven by denominator (ICV), not numerator (hippocampal volume)
+
+---
+
+# Hippocampus vs ICV and Gender
+
+.pull-leftWider[
+&lt;img src="imaging_fig/hipp_gender_scatter-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+]
+
+.pull-rightNarrower[
+
+- For a given ICV, there is not much difference between genders
+- These linear fits are more flexible than model above (two slopes for ICV vs one)
+
+]
+
+---
+
+# Hippocampal volume ( `\(\textrm{mm}^3\)`, %ICV, and model-adjusted)
+
+&lt;img src="imaging_fig/hipp_gender_box-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Hippocampal volume ( `\(\textrm{mm}^3\)`, %ICV, and model-adjusted)
+
+.pull-leftWider[
+
+&lt;img src="imaging_fig/hipp_adj_gender_scatter-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-rightNarrower[
+
+- Model: 
+.small[
+`\(Y_i=\beta_0 + \beta_{\textrm{ICV}}\textrm{ICV}_i  + \beta_{\textrm{Male}}\textrm{Male}_i + \varepsilon_i\)`
+]
+- Adjusted volume: `\(Y_i - \hat{\beta}_{\textrm{ICV}}\textrm{ICV}_i\)` 
+- Adjustment removes slope for ICV
+
+]
+
+---
+
+class: inverse, middle, center
+
+# Centiloids
+
+---
+
+# Centiloids
+
+.large[
+
+- Centiloids have become the industry standard standardized measure of amyloid PET (Klunk, et al., 2015)
+- Helpful in multi-site studies where different amyloid PET tracers might be utilized.
+- What is a centiloid?
+
+]
+
+---
+
+# What is a centiloid? Step 1: PiB SUVr to CL
+
+.large[
+
+- The original/base PiB SUVr to centiloid map:
+- 1.009 PiB SUVr (mean in young controls) `\(\rightarrow\)` 0 CL
+- 2.076 PiB SUVr (mean in AD cases) `\(\rightarrow\)` 100 CL
+- For other PiB SUVr values, draw the line from (1.009 SUVr, 0 CL) to (2.076 SUVr, 100 CL)
+- CL = 100 `\(\times\)` (PiB SUVr - 1.009)/1.067 (Klunk, et al., 2015)
+
+]
+
+---
+
+# What is a centiloid? Step 1: PiB SUVr to CL
+
+&lt;img src="imaging_fig/unnamed-chunk-8-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# What is a centiloid? Step 2: Other SUVr to PiB SUVr
+
+.large[
+
+- Step 2 requires *paired* data: each individuals scanned with PiB and the other tracer
+- Linear regression (ordinary least squares) is used to create linear transformation
+- Transformed data is then mapped to CL using map on prior slide
+
+]
+
+---
+
+# What is a centiloid? Step 2: Other SUVr to PiB SUVr
+
+&lt;img src="./images/rowe2017.png" width="75%"  style="display: block; margin: auto;" /&gt;
+
+`\(\textrm{SUVR}_{\textrm{FBB}} = 0.61 \times  \textrm{SUVR}_{\textrm{PiB}} + 0.39\)`
+
+Rowe, et al. (2017)
+
+---
+
+# Distribution mapping
+
+&lt;img src="./images/properzi2019.png" width="75%"  style="display: block; margin: auto;" /&gt;
+
+Properzi, et al. (2019)
+
+???
+
+Another approach is normalizing data from different tracers (or fluid assays for that matter) is map distributions.
+
+If we only have unpaired data from similar populations, we can map one to other under the assumption that their distributions should have similar shape.
+
+---
+
+# Emprical Cumulative Distribution Function (ECDF)
+
+&lt;img src="imaging_fig/unnamed-chunk-11-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+???
+
+CDFs are useful one-to-one maps
+
+Underly random number generators. A random number from a uniform 0-1 distribution can be mapped to any other distribution by the inverse CDF.
+
+In this case we can map PiB SUVRs to florbetapir SUVRs or vice versa
+
+But it only works if samples are similar, and we believe both tracers would sort the samples similarly.
+
+---
+
+# Weighted ECDFs to correct for sampling differences
+
+N (%) per diagnosis and tracer:
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt;   &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; PiB &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Florbetapir &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; CN &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 20 (21.5%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 478 (38.2%) &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; MCI &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 49 (52.7%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 568 (45.4%) &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Dementia &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 24 (25.8%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 206 (16.5%) &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+Inverse proportion weights:
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt;   &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PiB &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Florbetapir &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; CN &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; MCI &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Dementia &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.1 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+???
+
+similar methodology underlies CDC growth charts that provide height and weight 
+percentiles per age 
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+
+```r
+# Record the sampling adjustment weights in the data
+dd &lt;- dd %&gt;% mutate(
+  wt = case_when(
+    DX == 'CN' &amp; Tracer == 'PiB' ~ invproptab['CN', 'PiB'],
+    DX == 'MCI' &amp; Tracer == 'PiB' ~ invproptab['MCI', 'PiB'],
+    DX == 'Dementia' &amp; Tracer == 'PiB' ~ invproptab['Dementia', 'PiB'],
+    DX == 'CN' &amp; Tracer == 'Florbetapir' ~ invproptab['CN', 'Florbetapir'],
+    DX == 'MCI' &amp; Tracer == 'Florbetapir' ~ invproptab['MCI', 'Florbetapir'],
+    DX == 'Dementia' &amp; Tracer == 'Florbetapir' ~ invproptab['Dementia', 'Florbetapir']
+  ))
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+
+```r
+# Create adjusted ECDF functions (mapping SUVRs to Cumulative Probabilities)
+# Hmisc::wtd.Ecdf returns a data.frame evaluating the ECDF at each observed value
+PiB.ecdf.data &lt;- with(subset(dd, Tracer == 'PiB'), 
+  Hmisc::wtd.Ecdf(SUVR, weights=wt, normwt=TRUE))
+Fbp.ecdf.data &lt;- with(subset(dd, Tracer == 'Florbetapir'), 
+  Hmisc::wtd.Ecdf(SUVR, weights=wt, normwt=TRUE))
+
+# approxfun creates a function via linear interpolation 
+# mapping SUVRs to cumulative probabilities (0 to 1 scale)
+PiB.ecdf &lt;- with(PiB.ecdf.data, approxfun(x, ecdf, rule=2))
+Fbp.ecdf &lt;- with(Fbp.ecdf.data, approxfun(x, ecdf, rule=2))
+
+# Create adjusted **inverse** ECDF functions 
+# mapping Cumulative Probabilities (0 to 1 scale) to SUVRs
+Probs &lt;- seq(0,1,by=0.01)
+PiB.inv.ecdf.data &lt;- as.numeric(with(subset(dd, Tracer == 'PiB'), 
+  Hmisc::wtd.quantile(SUVR, weights=wt, normwt=TRUE, probs=Probs)))
+Fbp.inv.ecdf.data &lt;- as.numeric(with(subset(dd, Tracer == 'Florbetapir'), 
+  Hmisc::wtd.quantile(SUVR, weights=wt, normwt=TRUE, probs=Probs)))
+
+PiB.inv.ecdf &lt;- approxfun(Probs, PiB.inv.ecdf.data, rule=2)
+Fbp.inv.ecdf &lt;- approxfun(Probs, Fbp.inv.ecdf.data, rule=2)
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+
+```r
+dd &lt;- dd %&gt;% mutate(
+  `Adjusted cumulative probability` = case_when( # 
+    Tracer == 'PiB' ~ PiB.ecdf(SUVR),
+    Tracer == 'Florbetapir' ~ Fbp.ecdf(SUVR)),
+  `Adjusted Z-score` = qnorm(`Adjusted cumulative probability`), # adjusted z-scores
+  `Florbetapir to PiB adjusted SUVR` = case_when(
+    Tracer == 'Florbetapir' ~ PiB.inv.ecdf(Fbp.ecdf(SUVR))),
+  `PiB to Florbetapir adjusted SUVR` = case_when(
+    Tracer == 'PiB' ~ Fbp.inv.ecdf(PiB.ecdf(SUVR))),
+  CL = case_when(
+    Tracer == 'PiB' ~ 100*(SUVR - 1.009)/1.067)) %&gt;%
+  arrange(Tracer, SUVR)
+```
+
+---
+
+# Weighted ECDFs to correct for sample differences
+
+&lt;img src="imaging_fig/weighted-ecdfs-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+* solid line is un-adjusted ECDF; dashed line is ECDF adjusted for sample differences
+
+---
+
+# Centiloids vs ADNI Percentiles
+
+&lt;img src="imaging_fig/unnamed-chunk-17-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Densities for estimated and actual PiB SUVRs
+
+&lt;img src="imaging_fig/pib-densities-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+???
+
+Not perfectly matched due to different sample characteristics. To be expected.
+
+Recall PiB had less representation of CU and Florbetapir had more with dementia
+
+---
+
+# Densities by diagnosis
+
+&lt;img src="imaging_fig/pib-densities-dx-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Densities for weighted ECDF derived z-scores
+
+&lt;img src="imaging_fig/z-score-densities-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+Useful for analysis, as in Li, et al. (2019)
+
+???
+
+Useful for analysis
+
+---
+
+# Using the ECDF derived z-scores for analysis
+
+.pull-left[
+
+&lt;img src="./images/li2019.png" width="95%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+* ECDF derived z-scores were used in model (assuming Gaussian residuals)
+* Posterior estimates (on z-score scale) then back transformed to cumulative probabilities
+* Natural interpretation:
+  * 0 (most healthy) to 1 (most severe) 
+  * Comparable across different measures
+
+(Li, et al., 2019)
+
+]
+
+---
+
+# Validation on a holdout set with both tracers (FBB `\(\rightarrow\)` PiB)
+
+&lt;img src="imaging_fig/unnamed-chunk-19-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+`\(^*\)` Using PiB = (Florbetapir - 0.502)/0.536 from Navitsky, et al. (2018)
+
+???
+
+We held out a random sample of 10 participants with both PiB and FBB
+
+Note that the linear mapping from Navitsky is estimating PiB values outside of 
+the observed range of actual PiB values (near 0.75). 
+
+This will never happen with ECDF mapping.
+
+---
+
+# Validation on a holdout set with both tracers (PiB `\(\rightarrow\)` FBB)
+
+&lt;img src="imaging_fig/unnamed-chunk-20-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+`\(^*\)` Using Florbetapir = PiB `\(\times\)` 0.536 + 0.502 from Navitsky, et al. (2018)
+
+???
+
+This type of approach could also be useful for standardizing fluid assays
+
+---
+
+# Validation on a holdout set with both tracers (FBB `\(\rightarrow\)` PiB)
+
+&lt;img src="imaging_fig/unnamed-chunk-21-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+`\(^*\)` Using PiB = (Florbetapir - 0.503)/0.497 from Royse, et al. (2021)
+
+???
+
+---
+
+# Validation on a holdout set with both tracers (PiB `\(\rightarrow\)` FBB)
+
+&lt;img src="imaging_fig/unnamed-chunk-22-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+`\(^*\)` Using Florbetapir = PiB `\(\times\)` 0.497 + 0.503 from Royse, et al. (2021)
+
+???
+
+dashed line is FBP threshold of 1.11
+
+---
+
+# Where is linear map struggling?
+
+.pull-left[
+
+&lt;img src="./images/Royse_2021_Fig2.png" width="80%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+&lt;img src="./images/Royse_2021_Fig2_zoom.png" width="70%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+From Royse, et al. (2021)
+
+---
+
+class: inverse, middle, center
+
+# Longitudinal Data
+
+---
+
+# Repeated Measures/Longitudinal Data
+
+.large[
+
+* In Alzheimer's Disease (AD) studies we typically assess study participants **longitudinally** or **repeatedly** over time
+* This gives rise to **serial observations** for each participant at various time points post baseline
+* We cannot treat these serial observations as if they came from different people
+* Our analysis methods must account for **within-subject correlation**
+* There are specialized statistical methods to help accommodate many varieties of **correlated** or **clustered** data
+* We will explore **longitudinal data analysis** approaches commonly employed in AD clinical trials
+* We will demonstrate these methods on a **simulated** clinical trial dataset 
+
+]
+
+---
+
+# Repeated Measures/Longitudinal Data
+
+
+
+```
+Linear mixed-effects model fit by REML
+  Data: ADNIMERGE::adnimerge 
+  Subset: M &lt;= 24 &amp; DX.bl == "AD" 
+   AIC  BIC logLik
+  7463 7504  -3724
+
+Random effects:
+ Formula: ~M | RID
+ Structure: General positive-definite, Log-Cholesky parametrization
+            StdDev Corr  
+(Intercept) 6.00   (Intr)
+M           0.37   0.49  
+Residual    3.28         
+
+Fixed effects:  ADAS11 ~ PTGENDER + center(AGE) + I(Years.bl * 12) 
+                 Value Std.Error  DF t-value p-value
+(Intercept)       19.8      0.50 776      40    0.00
+PTGENDERMale      -0.1      0.66 395       0    0.92
+center(AGE)        0.1      0.04 395       1    0.18
+I(Years.bl * 12)   0.4      0.02 776      16    0.00
+ Correlation: 
+                 (Intr) PTGEND c(AGE)
+PTGENDERMale     -0.747              
+center(AGE)       0.075 -0.086       
+I(Years.bl * 12)  0.108 -0.001  0.014
+
+Standardized Within-Group Residuals:
+   Min     Q1    Med     Q3    Max 
+-2.412 -0.435 -0.043  0.399  2.434 
+
+Number of Observations: 1175
+Number of Groups: 398 
+```
+
+---
+
+# Simulating a hypothetical clinical trial `\(\ldots\)`
+
+.large[
+
+* Two groups: placebo vs active (hypothetical)
+* `\(n=200\)` mild to moderate dementia subjects per group
+* Alzheimer's Disease Assessment Scale (ADAS-Cog) assessed at 0, 6, 12, 18 months
+* Placebo group behaves like ADNI participants
+* Weak effects for age and sex (based on ADNI pilot estimates)
+* A treatment which slows ADAS-Cog progression by 12%
+* Typical attrition (about 30%)
+
+]
+
+---
+
+# Simulating a hypothetical clinical trial `\(\ldots\)`
+
+.large[
+
+Simulation **reverses** the usual process of statistical modeling/estimation
+
+* Model fitting: Data + Model `\(\rightarrow\)` Parameter Estimates
+* Model simulation: Model + Parameter Estimates `\(\rightarrow\)` Pseudo Data
+* Given a reasonable model, everything can be simulated: mean, variance, missingness, etc.
+* CAUTION: Simulations can only provide information about **models**, but they cannot 
+provide information about **reality**. **Real data** is required for the latter.
+
+]
+
+---
+
+# Simulating a hypothetical clinical trial `\(\ldots\)`
+
+These are all estimates required:
+
+
+```r
+# fixed effects parameters estimated from ADNI
+Beta &lt;- c(
+   '(Intercept)'=20 , # mean ADAS at baseline
+        'female'=0.1, # worse scores for females
+         'age_c'=0.1, # worse change for older at baseline (age mean centered)
+         'month'=0.4, # worse per month post baseline
+  'month:active'=-0.05) # improvement per month with treatment
+
+# standard deviations for random effects
+sigma_random_intercept &lt;- 6.0
+sigma_random_slope &lt;- 0.37
+sigma_residual &lt;- 3.3
+
+# other design parameters
+months &lt;- c(0, 6, 12, 18)
+n &lt;- 200 # per group
+attrition_rate &lt;- 0.40/18 # approx per month
+```
+
+
+
+
+---
+
+# The pseudo data snapshot
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; id &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; month &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; active &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; female &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; age &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; censor &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ran.intercept &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ran.slope &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; age_c &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Female &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; residual &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ADAS11 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 69 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.37 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.7 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Male &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.43 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 69 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.37 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.7 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Male &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.55 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 31 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 69 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.37 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.7 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Male &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.36 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 39 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 69 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.37 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.7 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Male &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.66 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 44 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 88 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 51 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Female &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.02 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 88 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 51 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; Female &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.49 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 26 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# The pseudo data: Baseline characteristics
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt;  &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; placebo (N=200) &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; active (N=200) &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Total (N=400) &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; p value &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Female &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.764 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Female &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 106 (53.0%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 103 (51.5%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 209 (52.2%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Male &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 94 (47.0%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 97 (48.5%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 191 (47.8%) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; age &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.689 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Mean (SD) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 74.716 (7.936) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 75.036 (8.039) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 74.876 (7.979) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Range &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 53.884 - 97.940 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 57.228 - 96.349 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 53.884 - 97.940 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; ADAS11 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.386 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Mean (SD) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 20.725 (7.002) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 20.135 (6.576) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 20.430 (6.790) &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; -  Range &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 5.000 - 44.000 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 3.000 - 37.000 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 3.000 - 44.000 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt;  &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# The pseudo data: Spaghetti plot
+
+&lt;img src="imaging_fig/spaghetti_plot-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Basic longitudinal summaries of ADAS11
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; group &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; month &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; lower95 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; upper95 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; min &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; max &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;vertical-align: middle !important;" rowspan="4"&gt; placebo &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 200 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 44 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 180 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 43 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 163 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 26 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 51 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 149 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 29 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 31 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 55 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;vertical-align: middle !important;" rowspan="4"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 200 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 37 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 180 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 39 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 158 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 26 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 45 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 142 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 54 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# Mean ADAS
+
+&lt;img src="imaging_fig/meanplot-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Basic longitudinal summaries of ADAS11 _change_
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; group &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; month &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; n &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; lower95 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; upper95 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; min &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; max &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;vertical-align: middle !important;" rowspan="4"&gt; placebo &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 200 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 180 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -14 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 163 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 149 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;vertical-align: middle !important;" rowspan="4"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 200 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 180 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 158 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 142 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -15 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# Mean ADAS change (95% CI)
+
+&lt;img src="imaging_fig/meanchplot-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+class: inverse, middle, center
+
+# `\(t\)`-test
+
+---
+
+# Two sample `\(t\)`-test of mean change at month 18 
+
+## (completers analysis)
+
+
+
+.large[
+
+* Difference between group means is
+    8.34 - 6.51  = 1.83 
+* (pooled) standard deviation is 8.11 
+*  `\(t = \frac{1.83}{8.11\sqrt{\frac{1}{149} + \frac{1}{142}}} =  1.92\)`
+* 149 + 142 - 2 = 289 _degrees of freedom_
+
+]
+
+---
+
+# `\(t\)`-test
+
+
+```
+
+	Two Sample t-test
+
+data:  ADAS11.ch by group
+t = 1.923, df = 289, p-value = 0.0555
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.0429371  3.6993319
+sample estimates:
+mean in group placebo  mean in group active 
+              8.34228               6.51408 
+```
+
+---
+
+# The `\(t_{289}\)`-distribution
+
+`\(p\)`-value is area under curve for `\(|x|&gt;1.92\)`, the value of the test statistic in this case. This area is depicted in blue here (area = `\(p\)` = 0.055).
+
+&lt;img src="imaging_fig/unnamed-chunk-33-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+class: inverse, middle, center
+
+# Regression
+
+---
+
+# Regression analysis
+
+.large[
+
+* **Regression** generally refers to a relationship between variables that is estimated by data
+* **Ordinary Least Squares** regression, for example, describes a linear relationship between two continuous variables that is estimated by the line that minimizes the sum of squared "residuals"
+* **predictor/covariate** `\(\rightarrow\)` **response/outcome**
+* **Residuals** are the differences between observations and values predicted by the regression
+
+]
+
+---
+
+# Other types of regression
+
+.large[
+
+* **General linear models** can add multiple **covariates/predictors**
+* **Generalized linear models** can accommodate other types of **outcome/response** variables (e.g. logistic regression can accommodate binary outcome variables)
+* **Mixed-effects models** mix **random effects** with the standard **fixed effects** to account for complex correlation structures
+
+All regression models share the common theme of estimating the best fit relationship between
+**outcome/response** variables and **covariates/predictors** under some assumptions.
+
+]
+
+---
+
+class: inverse, middle, center
+
+# ANCOVA
+
+---
+
+# ANalysis of COVAriance (ANCOVA) for "pre-post" data
+
+* Very common for two groups, and **one** post- assessment
+* `\(\textrm{ADAS}_{i1}\)`: baseline or pre- observation for subject `\(i\)`, `\(i=1,\dots,200\)`
+* `\(\textrm{ADAS}_{i2}\)`: followup or post- observation for subject `\(i\)`, `\(i=1,\dots,200\)`
+* `\(\textrm{Active}_i\)`: treatment group indicator (e.g. 1 if active, 0 if placebo)
+* _ANCOVA I_: `\(\textrm{ADAS}_{i2} = \beta_0 + \textrm{Active}_i\beta_1 + \textrm{ADAS}_{i1}\beta_2 + \varepsilon_i\)`
+  * `\(\beta_0\)` is the _intercept_
+  * `\(\beta_1\)` is the estimate of interest: group difference at 18 months
+  * `\(\beta_2\)` controls for baseline ADAS
+  * `\(\varepsilon_i\)` is residual error
+* _ANCOVA II_: `\(\textrm{ADAS}_{i2} = \beta_0 + \textrm{Active}_i\beta_1 + \textrm{ADAS}_{i1}^*\beta_2 + \textrm{Active}_i\textrm{ADAS}_{i1}^*\beta_3 + \varepsilon_i\)`
+  * `\(\beta_3\)` controls for interaction of treatment assignment and baseline ADAS
+  * _Need to mean center baseline covariates_: `\(\textrm{ADAS}_{i1}^* = \textrm{ADAS}_{i1} - \bar{Y}_{\cdot0}\)`
+  * More efficient (statistical power)
+* "ANCOVA I model also fully efficient if the randomization probability to the treatment arm is 0.5 or when the covariance between the baseline and follow-up responses is the same for both the treatment and control groups"
+  
+Yang and Tsiatis (2001)
+
+---
+
+# ANCOVA I for effect of treatment on ADAS11 at 18 months
+
+
+```
+
+Call:
+lm(formula = ADAS11.ch ~ active + ADAS11.m0, data = trial_mmrm)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-18.113  -4.546  -0.488   4.336  24.358 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  10.0163     0.7316   13.69  &lt; 2e-16 ***
+active       -1.0217     0.4270   -2.39    0.017 *  
+ADAS11.m0    -0.2353     0.0321   -7.32  5.2e-13 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 6.7 on 969 degrees of freedom
+Multiple R-squared:  0.0562,	Adjusted R-squared:  0.0543 
+F-statistic: 28.9 on 2 and 969 DF,  p-value: 6.71e-13
+```
+
+---
+
+# ANCOVA II for effect of treatment on ADAS11 at 18 months
+
+
+```
+
+Call:
+lm(formula = ADAS11.ch ~ active * center(ADAS11.m0), data = trial_mmrm)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-18.318  -4.453  -0.436   4.304  24.069 
+
+Coefficients:
+                         Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)                5.2199     0.3000   17.40  &lt; 2e-16 ***
+active                    -1.0203     0.4269   -2.39    0.017 *  
+center(ADAS11.m0)         -0.2739     0.0445   -6.15  1.1e-09 ***
+active:center(ADAS11.m0)   0.0805     0.0643    1.25    0.211    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 6.7 on 968 degrees of freedom
+Multiple R-squared:  0.0577,	Adjusted R-squared:  0.0548 
+F-statistic: 19.8 on 3 and 968 DF,  p-value: 1.92e-12
+```
+
+---
+
+# ANCOVA II with more covariates
+
+```
+
+Call:
+lm(formula = ADAS11.ch ~ active * center(ADAS11.m0) + female + 
+    age_c, data = trial_mmrm)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-19.306  -4.497  -0.398   4.314  23.719 
+
+Coefficients:
+                         Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)                4.9185     0.3770   13.05  &lt; 2e-16 ***
+active                    -1.0587     0.4254   -2.49    0.013 *  
+center(ADAS11.m0)         -0.2869     0.0446   -6.44  1.9e-10 ***
+female                     0.5765     0.4266    1.35    0.177    
+age_c                      0.0758     0.0269    2.81    0.005 ** 
+active:center(ADAS11.m0)   0.0901     0.0642    1.40    0.161    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 6.6 on 966 degrees of freedom
+Multiple R-squared:  0.0671,	Adjusted R-squared:  0.0623 
+F-statistic: 13.9 on 5 and 966 DF,  p-value: 3.87e-13
+```
+
+---
+
+# ANCOVA summary
+
+.large[
+
+* Familiar, simple, powerful framework
+* ANCOVA more powerful/efficient than `\(t\)`-test
+* Both are inherently **complete case** analyses!
+* With missing data, not intention-to-treat (ITT) analysis
+* Might be biased and/or inefficient (low power) with missing data
+
+]
+
+---
+
+class: inverse, middle, center
+
+# Two-stage models
+
+---
+
+# Two-stage models
+
+.large[
+
+* _Subject-specific_ longitudinal profiles can often be modeled with simple linear regression
+* This leads to the 2-stage model:
+  
+  * _Stage 1_: Linear regression model for each subject separately
+  * _Stage 2_: Model subject-specific regression coefficients with covariates of interest
+  
+* However, this is **NOT** a recommend analysis approach, but rather a means to introduce mixed-effect models.
+
+]
+
+---
+
+# Two-stage model example
+
+.large[
+
+* _Stage 1_: `\(\textrm{ADAS}_{ij} = \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_i\)` for subject `\(i\)` at time `\(t_{ij}\)`
+* Provides estimates of subject-specific intercepts, `\(\hat\beta_{0i}\)` and slopes `\(\hat\beta_{0i}\)`
+* `\(\varepsilon_i \sim \mathcal{N}(0,\sigma^2_iI_{n_i})\)` estimates _within_-subject variability
+* _Between_-subject variability can now be modeled by treating `\(\hat\beta_i\)` as "response variables"
+* _Stage 2_: `\(\hat\beta_{1i} = X_i\beta + \varepsilon'_i\)`
+
+]
+
+---
+
+# Stage 1 models of simulated trial
+
+&lt;img src="imaging_fig/trial_stage1_plot-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Stage 1 model of simulated trial
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; id &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; beta.(Intercept) &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; beta.month &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sigma &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; active &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; group &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; age_c &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; female &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.93 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.70 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NaN &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; placebo &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -17.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NaN &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -15.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NaN &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; active &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+???
+
+NAs are from too few observations due to missing data
+
+---
+
+# Stage 1 model of simulated trial
+
+
+```
+
+Call:
+lm(formula = ADAS11 ~ month, data = trial_obs, subset = id == 
+    1)
+
+Residuals:
+   1    2    3    4 
+ 0.9 -1.7  0.7  0.1 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)   
+(Intercept)   27.100      1.212   22.35    0.002 **
+month          0.933      0.108    8.64    0.013 * 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 1.4 on 2 degrees of freedom
+Multiple R-squared:  0.974,	Adjusted R-squared:  0.961 
+F-statistic: 74.7 on 1 and 2 DF,  p-value: 0.0131
+```
+
+---
+
+# Stage 2 model of simulated trial
+
+&lt;img src="imaging_fig/trial_plot_stage2-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Stage 2 model of simulated trial
+
+
+```
+
+Call:
+lm(formula = beta.month ~ female + age_c + active, data = trial_stage1)
+
+Residuals:
+   Min     1Q Median     3Q    Max 
+-2.508 -0.313  0.057  0.353  1.846 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  0.38692    0.05039    7.68  1.6e-13 ***
+female      -0.00358    0.05694   -0.06     0.95    
+age_c        0.00378    0.00356    1.06     0.29    
+active      -0.03054    0.05688   -0.54     0.59    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.54 on 356 degrees of freedom
+  (40 observations deleted due to missingness)
+Multiple R-squared:  0.0039,	Adjusted R-squared:  -0.00449 
+F-statistic: 0.465 on 3 and 356 DF,  p-value: 0.707
+```
+
+---
+
+# Two-stage models
+
+.large[
+
+* In contrast to ANCOVA and `\(t\)`-test, two-stage models allow all randomized subject with at least one followup to be included into analysis ("*modified intention-to-treat*")
+* However, second stage models ignore the variability/uncertainty of the slope estimates from the first stage
+* This means that `\(p\)`-values from second stage might be smaller than they should be and Type I error could be inflated
+
+]
+
+
+
+---
+
+# Summary
+
+.large[
+
+* Avoid using ratios whenever possible. Better to include "denominators" as covariates in regression models.
+* The Empirical Cumulative Distribution Function (ECDF) is a useful non-parametric tool for standardization.
+  * Can handle non-linear relationships
+  * Percentiles are intuitive and familiar
+  * ECDF derived maps will not produce out-of-range estimates
+  * Percentiles can be mapped to standard normal `\(z\)`-scores to facilitate modelling
+* Introduction to longitudinal data analysis
+  * Plots, summaries, `\(t\)`-test, regression, ANCOVA, two-stage models
+
+]
+
+---
+
+# References (1/2)
+
+Klunk, W. E., R. A. Koeppe, J. C. Price, T. L. Benzinger, M. D. Devous
+Sr, W. J. Jagust, K. A. Johnson, C. A. Mathis, D. Minhas, M. J.
+Pontecorvo, et al. (2015). "The Centiloid Project: standardizing
+quantitative amyloid plaque estimation by PET". In: _Alzheimer's &amp;
+dementia_ 11.1, pp. 1-15.
+
+Kronmal, R. A. (1993). "Spurious correlation and the fallacy of the
+ratio standard revisited". In: _Journal of the Royal Statistical
+Society: Series A (Statistics in Society)_ 156.3, pp. 379-392.
+
+Li, D., S. Iddi, W. K. Thompson, M. C. Donohue, and Alzheimer’s Disease
+Neuroimaging Initiative (2019). "Bayesian latent time joint mixed
+effect models for multicohort longitudinal data". In: _Statistical
+methods in medical research_ 28.3, pp. 835-845.
+
+Navitsky, M., A. D. Joshi, I. Kennedy, W. E. Klunk, C. C. Rowe, D. F.
+Wong, M. J. Pontecorvo, M. A. Mintun, and M. D. Devous Sr (2018).
+"Standardization of amyloid quantitation with florbetapir standardized
+uptake value ratios to the Centiloid scale". In: _Alzheimer's &amp;
+Dementia_ 14.12, pp. 1565-1571.
+
+Properzi, M. J., R. F. Buckley, J. P. Chhatwal, M. C. Donohue, C. Lois,
+E. C. Mormino, K. A. Johnson, R. A. Sperling, and A. P. Schultz (2019).
+"Nonlinear Distributional Mapping (NoDiM) for harmonization across
+amyloid-PET radiotracers". In: _Neuroimage_ 186, pp. 446-454.
+
+Rowe, C. C., V. Doré, G. Jones, D. Baxendale, R. S. Mulligan, S.
+Bullich, A. W. Stephens, S. De Santi, C. L. Masters, L. Dinkelborg, et
+al. (2017). "18 F-Florbetaben PET beta-amyloid binding expressed in
+Centiloids". In: _European journal of nuclear medicine and molecular
+imaging_ 44.12, pp. 2053-2059.
+
+---
+
+# References (2/2)
+
+Royse, S. K. et al. (2021). "Validation of amyloid PET positivity
+thresholds in centiloids: a multisite PET study approach". In:
+_Alzheimer's Research &amp; Therapy_ 13.1, pp. 1-10.
+
+Yang, L. et al. (2001). "Efficiency study of estimators for a treatment
+effect in a pretest-posttest trial". In: _The American Statistician_
+55.4, pp. 314-321.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "solarized-light",
+"highlightLanguage": ["r", "css", "yaml"],
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

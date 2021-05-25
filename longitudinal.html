@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Biostatistics for Longitudinal Data</title>
+    <meta charset="utf-8" />
+    <script src="libs/header-attrs-2.6/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="css/styles.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+class: middle, center
+
+# Biostatistics for Longitudinal Data
+
+Michael Donohue, PhD
+
+University of Southern California
+
+### Biomarkers in Neurodegenerative Disorders
+
+University of Gothenburg
+
+May 26, 2021
+
+
+  
+
+
+
+
+
+.pull-left[
+
+&lt;img src="./images/atri.png" width="57%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+&lt;img src="./images/actc_logo.png" width="47%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+---
+
+# Session 3 Outline
+
+.large[
+- Mixed effect models
+- Mean &amp; Variance Structure
+- Mixed Model for Repeated Measures (MMRM)
+- Constrained Longitudinal Analysis (cLDA)
+- Model selection strategies
+- Nested random effects
+- Missing Data, MAR, MNAR
+- Multiple Imputation &amp; Delta Method
+]
+
+---
+
+class: inverse, middle, center
+
+# Mixed-effects Models
+
+---
+
+# Linear mixed-effects model (LME)
+
+Linear mixed-effects models provide a cleaner, more efficient, and more accurate one-step alternative to two-stage models
+
+`$$\left. \begin{array}{ll}
+\textrm{Stage 1: } \textrm{ADAS}_{ij} &amp;= \beta_{0i} + t_{ij}\beta_{1i} + \varepsilon_{ij}\\
+\textrm{Stage 2: } \hat\beta_{1i} &amp;= X_i\beta + \varepsilon'_{ij}
+  \end{array} \right\} \rightarrow
+  \textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$`
+
+* `\(X_i\)`: covariates for subject `\(i=1,\ldots,400\)`
+* `\(\beta\)`: population level _fixed effects_
+* `\(b_i \sim \mathcal{N}(0,D)\)`: subject-specific _random effects_ for subject `\(i=1,\ldots,400\)`
+* `\((\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)\)`: vector of _residuals_ for subject `\(i=1,\ldots,400\)`
+* `\(D,\, \Sigma\)`: _variance components_
+
+`\(b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N\)` are assumed independent
+
+---
+
+# Linear mixed-effects models of simulated trial
+
+
+```
+Linear mixed-effects model fit by REML
+  Data: trial_obs 
+   AIC  BIC logLik
+  8501 8537  -4243
+
+Random effects:
+ Formula: ~month | id
+ Structure: General positive-definite, Log-Cholesky parametrization
+            StdDev Corr  
+(Intercept) 6.158  (Intr)
+month       0.387  -0.07 
+Residual    3.093        
+
+Fixed effects:  ADAS11 ~ month + month:active 
+             Value Std.Error  DF t-value p-value
+(Intercept)  20.39     0.336 970    60.7   0.000
+month         0.44     0.035 970    12.6   0.000
+month:active -0.08     0.049 970    -1.6   0.111
+ Correlation: 
+             (Intr) month 
+month        -0.151       
+month:active -0.002 -0.694
+
+Standardized Within-Group Residuals:
+    Min      Q1     Med      Q3     Max 
+-2.7321 -0.4976  0.0279  0.5005  2.6701 
+
+Number of Observations: 1372
+Number of Groups: 400 
+```
+
+---
+
+# LME model with additional covariates
+
+
+```
+Linear mixed-effects model fit by REML
+  Data: trial_obs 
+   AIC  BIC logLik
+  8499 8546  -4240
+
+Random effects:
+ Formula: ~month | id
+ Structure: General positive-definite, Log-Cholesky parametrization
+            StdDev Corr  
+(Intercept) 6.112  (Intr)
+month       0.387  -0.084
+Residual    3.093        
+
+Fixed effects:  ADAS11 ~ age_c + female + month + month:active 
+             Value Std.Error  DF t-value p-value
+(Intercept)  20.11     0.476 970    42.2  0.0000
+age_c         0.12     0.041 397     2.9  0.0034
+female        0.55     0.651 397     0.8  0.4012
+month         0.44     0.035 970    12.6  0.0000
+month:active -0.08     0.049 970    -1.6  0.1056
+ Correlation: 
+             (Intr) age_c  female month 
+age_c        -0.005                     
+female       -0.714  0.006              
+month        -0.108  0.001 -0.005       
+month:active -0.004 -0.004  0.003 -0.694
+
+Standardized Within-Group Residuals:
+    Min      Q1     Med      Q3     Max 
+-2.7120 -0.5023  0.0311  0.5034  2.6478 
+
+Number of Observations: 1372
+Number of Groups: 400 
+```
+
+---
+
+# Linear mixed-effects models (R code)
+
+
+```r
+lme(ADAS11 ~ month + month:active, 
+  data = trial_obs, random = ~month|id)
+
+lme(ADAS11 ~ age_c + female + month + month:active, 
+  data = trial_obs, random = ~month|id)
+```
+
+
+
+---
+
+# Mean profiles
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; active &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; month &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; emmean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; SE &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; df &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; lower.CL &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; upper.CL &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.456 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.456 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.479 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23.8 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.478 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.583 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 23.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 26.1 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.579 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27.0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.734 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28.5 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.727 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 397 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 29.9 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# Modeled mean profiles (shaded CIs)
+
+&lt;img src="long_fig/unnamed-chunk-4-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Plotting profiles (error bar CIs)
+
+&lt;img src="long_fig/unnamed-chunk-5-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+
+
+
+---
+
+# Mixed effect models: standard deviation of residuals
+
+&lt;img src="long_fig/unnamed-chunk-6-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Mixed effect models: standard deviation of random intercepts
+
+&lt;img src="long_fig/unnamed-chunk-7-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Mixed effect models: standard deviation of random slopes
+
+&lt;img src="long_fig/unnamed-chunk-8-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Random intercepts model
+
+* NOTE: With only two timepoints, it is impossible to fit a model with random slopes
+* If we drop the _random slope_ term, `\(t_{ij}b_{1i}\)`, what remains is called a _random intercepts_ model:
+
+`$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + \varepsilon_i$$`
+---
+
+# Random intercepts model
+
+.large[
+
+```
+Linear mixed-effects model fit by REML
+  Data: trial_obs 
+   AIC  BIC logLik
+  8734 8761  -4362
+
+Random effects:
+ Formula: ~1 | id
+        (Intercept) Residual
+StdDev:        6.47     4.24
+
+Fixed effects:  ADAS11 ~ month + month:active 
+             Value Std.Error  DF t-value p-value
+(Intercept)  20.36     0.371 970    54.8  0.0000
+month         0.46     0.024 970    18.8  0.0000
+month:active -0.09     0.033 970    -2.8  0.0049
+ Correlation: 
+             (Intr) month 
+month        -0.265       
+month:active -0.002 -0.675
+
+Standardized Within-Group Residuals:
+    Min      Q1     Med      Q3     Max 
+-3.0158 -0.5867  0.0253  0.5753  2.9082 
+
+Number of Observations: 1372
+Number of Groups: 400 
+```
+]
+
+---
+
+# Random intercepts model vs model with random slopes
+
+
+```r
+anova(fit_lme_int, fit_lme)
+            Model df  AIC  BIC logLik   Test L.Ratio p-value
+fit_lme_int     1  5 8734 8761  -4362                       
+fit_lme         2  7 8501 8537  -4243 1 vs 2     238  &lt;.0001
+```
+
+The model with random slopes is preferred (smaller AIC is better)
+
+---
+
+class: inverse, middle, center
+
+# Mean &amp; Variance Structure
+
+---
+
+# Key features of longitudinal models
+
+.large[
+
+* Last session we discussed a linear mixed effect model (LME) which treats time as a continuous variable
+* This is one type of longitudinal model among many types
+* Three key features of longitudinal models:
+  * **Mean structure**: Governs shape of mean trajectory
+  * **Variance-covariance structure**: Governs within-subject correlation
+  * **Baseline assessment**: Treated as covariate or outcome
+
+]
+
+---
+
+# Taxonomy of common longitudinal models
+
+|                        | **MMRM**             | **LDA**              | **cLDA**             |
+|------------------------|----------------------|----------------------|----------------------|
+|**Mean structure**      | cat. time            | cat. or cts. time    | cat. or cts. time    |
+|**Variance-covariance** | correlated residuals | correlated residuals | correlated residuals |
+|                        |                      | or random effects    |  or random effects   |
+|**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
+|                        |                      | different means      |  common mean         | 
+|                        |                      | per group            |  per group           |
+|**Appropriate use**     | Randomized groups    | Non-randomized groups| Randomized groups    |
+
+Abbreviations: 
+
+* MMRM: Mixed Model of Repeated Measures
+* LDA: Longitudinal Data Analysis
+* cLDA: Constrained LDA
+* cat.: categorical
+* cts.: continuous
+
+---
+
+# Linear mixed-effects model (LME)
+
+`$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$`
+* `\(X_i\)`: covariates for subject `\(i=1,\ldots,400\)`
+* `\(\beta\)`: population level _fixed effects_
+* `\(b_i \sim \mathcal{N}(0,D)\)`: subject-specific _random effects_ for subject `\(i=1,\ldots,400\)`
+* `\((\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)\)`: vector of _residuals_ for subject `\(i=1,\ldots,400\)`
+* `\(D,\, \Sigma\)`: _variance components_
+
+
+`\(b_1,\ldots,b_N,\varepsilon_1,\ldots,\varepsilon_N\)` are assumed independent
+
+---
+
+# Linear mixed-effects model (LME)
+
+`$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$`
+
+* _Mean structure_ (fixed effects): `\(X_i\beta\)`
+    * linear, quadratic, splines, or categorical time; and
+    * other fixed-effect covariates (age, education, gender, treatment)
+* _Variance structure_ (random effects &amp; residuals): `\(b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}\)`
+    * random intercept, random intercept &amp; slope; or
+    * impose variance-covariance (variance and correlation) structure on residuals `\((\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)\)`
+
+---
+
+class: inverse, middle, center
+
+# Mixed Model of Repeated Measures (MMRM)
+
+---
+
+# Mixed Model of Repeated Measures (MMRM)
+
+.large[
+* A popular _marginal model_, "Mixed Model of Repeated Measures" (MMRM), makes no (or very general) assumptions about the mean and variance/covariance structure.
+* **Unstructured mean:** time is treated as categorical, so no linear (or quadratic, etc.) trend is assumed
+* **Unstructured variance/covariance:** includes parameters for variance at each visit ("heterogeneous") and visit-to-visit correlation
+* A repeated measures extension of ANCOVA (instead of one post-baseline assessment, there are several)
+* MMRM is not actually a mixed-effects model (no random effects)!
+* Usually treats change from baseline as outcome variable, and baseline as covariate (like ANCOVA).
+* Requires categorizing/binning time (this has become problematic for clinical trials interrupted by COVID, for example) 
+]
+
+---
+
+# Mean structure examples
+
+&lt;img src="long_fig/unnamed-chunk-9-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Variance-covariance structure
+
+`$$\textrm{ADAS}_{ij} = X_i\beta + b_{0i} + t_{ij}b_{1i} + \varepsilon_{ij}$$`
+* _Vanilla_ LME assumes _homoscedastic_ (homogenous/constant variance), independent residuals
+* MMRM drops the `\(b\)` terms (random effects) and can assume _heteroscedastic_ (heterogeneous variance), correlated residuals
+  * `\((\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma)\)`
+  * `\(\Sigma = \sigma^2VCV\)`, where
+  * `\(\sigma^2\)` is variance scale parameter
+  * `\(V\)` is diagonal matrix of standard deviation weights
+  * `\(C\)` is correlation matrix
+
+---
+
+# Variance-covariance structure
+
+
+`$$(\varepsilon_{i1},\ldots,\varepsilon_{i4}) \sim \mathcal{N}(0,\Sigma),\quad \Sigma = \sigma^2VCV$$`
+
+Examples:
+
+```console
+                        Heterogeneous variance
+                                0  6 12 18
+                             0  1  0  0  0
+                        V =  6  0  2  0  0
+                            12  0  0  7  0
+                            18  0  0  0 10
+```
+
+```console
+ Exchangeable/Compound Symmetric              Unstructured/Symmetric
+             0    6   12   18                       0    6   12   18
+        0  1.0  0.2  0.2  0.2                  0  1.0  0.3  0.2  0.1
+    C = 6  0.2  1.0  0.2  0.2             C =  6  0.3  1.0  0.4  0.2
+       12  0.2  0.2  1.0  0.2                 12  0.2  0.4  1.0  0.2
+       18  0.2  0.2  0.2  1.0                 12  0.1  0.2  0.2  1.0
+```
+
+
+
+---
+
+# Homogeneous vs heterogeneous variance structure
+
+&lt;img src="long_fig/unnamed-chunk-10-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+???
+
+Right-hand side is more typical of our cognitive outcomes
+
+You can imagine what can go wrong if we assume the left-hand side instead. We would likely underestimated variance for later timepoints.
+
+---
+
+# Uncorrelated vs correlated residuals
+
+&lt;img src="long_fig/unnamed-chunk-11-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+
+
+
+
+---
+
+# Simulating categorical time data `\(\ldots\)`
+
+These are all estimates required:
+
+
+```r
+Beta &lt;- c(
+   '(Intercept)'= 19.8, # mean ADAS at baseline
+        'female'=-0.51, # female perform better
+         'age_c'= 0.04, # worse change for older at baseline (age mean centered)
+            'm6'= 2.23, # worsening at month 6 in pbo
+           'm12'= 4.46, # worsening at month 12 in pbo
+           'm18'= 7.31, # worsening at month 18 in pbo
+     'm6:active'=-0.20, # relative improvement at month 6 with treatment
+    'm12:active'=-0.70, # relative improvement at month 12 with treatment
+    'm18:active'=-1.75) # relative improvement at month 18 with treatment
+
+# other design parameters
+months &lt;- c(0, 6, 12, 18)
+n &lt;- 200 # per group
+attrition_rate &lt;- 0.40/18 # approx per month
+
+# var-cov parameters
+SD &lt;- 6.77                          # standard deviation scale parameter
+vv &lt;- diag(c(1, 1.2, 1.5, 1.8))          # heterogeneous variance weight matrix
+cc &lt;- matrix(0.75, nrow=4, ncol=4)   # correlation matrix
+diag(cc) &lt;- 1
+```
+
+
+
+---
+
+# The pseudo categorical time data
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; id &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; m &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; m0 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; m6 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; m12 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; m18 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ADAS11.m0 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; active &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; female &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; age &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; censor &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; age_c &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; residual &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ADAS11 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; ADAS11.ch &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 75.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 53.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.162 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.44 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 75.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 53.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.162 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -2.08 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 75.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 53.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.162 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -8.71 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 74.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.957 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 16.20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 37 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 12 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 74.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.957 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.67 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 32 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 27 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 74.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -0.957 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 17.33 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 42 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 15 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# The pseudo categorical time data
+
+&lt;img src="long_fig/spaghetti_plot-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Fitting MMRM in R
+
+
+```r
+# Symmetric correlation, heterogeneous variance
+MMRMsymHet &lt;- gls(ADAS11.ch ~ 
+  -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_mmrm, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# Compound Symmetric correlation, heterogeneous variance
+MMRMcompSymHet &lt;- gls(ADAS11.ch ~ 
+  -1+ADAS11.m0+female+age_c+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_mmrm, correlation = corCompSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+```
+
+See `?corClasses` and `?varClasses` in `R`; and chapter 5 in Pinheiro, et al. (2006)
+for more details.
+
+---
+
+# MMRM summaries in R
+
+
+```r
+summary(MMRMsymHet)
+```
+
+
+```
+Correlation Structure: General
+ Formula: ~visNo | id 
+ Parameter estimate(s):
+ Correlation: 
+  1     2    
+2 0.373      
+3 0.313 0.462
+Variance function:
+ Structure: Different standard deviations per stratum
+ Formula: ~1 | m 
+ Parameter estimates:
+   6   12   18 
+1.00 1.23 1.52 
+```
+
+---
+
+# MMRM summaries in R
+
+
+```
+Coefficients:
+             Value Std.Error t-value p-value    
+ADAS11.m0  -0.0333    0.0393   -0.85  0.3969    
+female     -0.1505    0.5288   -0.28  0.7760    
+age_c       0.0153    0.0338    0.45  0.6509    
+m6          3.5506    0.9292    3.82  &lt;0.001 ***
+m12         6.0987    0.9879    6.17  &lt;0.001 ***
+m18         9.3641    1.0782    8.69  &lt;0.001 ***
+m6:active  -1.0503    0.5815   -1.81  0.0712 .  
+m12:active -1.7923    0.7519   -2.38  0.0173 *  
+m18:active -2.7946    0.9793   -2.85  0.0044 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+Residual standard error: 5.5 
+```
+
+---
+
+class: inverse, middle, center
+
+# Constrained Longitudinal Data Analysis (cLDA)
+
+---
+
+# Fitting cLDA in R
+
+
+```r
+# Symmetric correlation, heterogeneous variance
+cLDAsymHet &lt;- gls(ADAS11 ~ 
+  -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_obs, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+
+# Compound Symmetric correlation, heterogeneous variance
+cLDAcompSymHet &lt;- gls(ADAS11 ~ 
+  -1+female+age_c+m0+(m6+m12+m18)+(m6+m12+m18):active,
+  data=trial_obs, correlation = corCompSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m) )
+```
+
+---
+
+# cLDA summaries in R
+
+```
+Correlation Structure: General
+ Formula: ~visNo | id 
+ Parameter estimate(s):
+ Correlation: 
+  1     2     3    
+2 0.724            
+3 0.742 0.718      
+4 0.752 0.710 0.749
+Variance function:
+ Structure: Different standard deviations per stratum
+ Formula: ~1 | m 
+ Parameter estimates:
+   0    6   12   18 
+1.00 1.18 1.50 1.80 
+```
+
+---
+
+# MMRM summaries in R
+
+
+```
+Coefficients:
+             Value Std.Error t-value p-value    
+female     -1.1830    0.6249   -1.89   0.059 .  
+age_c       0.0214    0.0400    0.54   0.592    
+m0         20.3340    0.4565   44.54  &lt;0.001 ***
+m6         23.1395    0.5822   39.74  &lt;0.001 ***
+m12        25.6893    0.7046   36.46  &lt;0.001 ***
+m18        29.0464    0.8433   34.44  &lt;0.001 ***
+m6:active  -1.0485    0.5743   -1.83   0.068 .  
+m12:active -1.8187    0.7405   -2.46   0.014 *  
+m18:active -2.8550    0.9241   -3.09   0.002 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+Residual standard error: 6.66 
+```
+
+---
+
+# Fitting continuous time cLDA in R
+
+
+```r
+# Linear time
+cLDAlin &lt;- gls(ADAS11 ~ 
+  female + age_c + month + month:active,
+  data=trial_obs, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m))
+
+# Quadratic time
+cLDAquad &lt;- gls(ADAS11 ~ 
+  female + age_c + (month + I(month^2)) + (month + I(month^2)):active,
+  data=trial_obs, correlation = corSymm(form = ~ visNo | id),
+  weights = varIdent(form = ~ 1 | m))
+```
+
+
+
+
+
+---
+
+# Modeled mean profiles
+
+&lt;img src="long_fig/unnamed-chunk-26-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+
+
+---
+
+# cLDA with Natural Cubic Splines
+
+.pull-leftWider[
+
+&lt;img src="long_fig/unnamed-chunk-28-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-rightNarrower[
+
+
+Natural Cubic Spline :
+
++ Group 1 mean at `\(t\)`: `\(f_1(t)\)`
+
++ Group 2 mean at `\(t\)`: `\(f_2(t)\)`
+
++ `\(f_1\)` and `\(f_2\)` are two smooth functions
+
+  + cubic basis functions
+
+  + "natural" implies second derivatives are zero at boundaries
+
+]
+
+???
+
+This model uses natural cubic splines to model the mean in each group. In this case we assume:
+
+- cubic spline basis functions,  
+- just one interior knot, and
+- second derivatives are fix at 0 on the boundaries.
+
+This constraint helps to avoids spurious flips of the curves near the last observations.
+
+---
+
+# Natural Cubic Splines (df=2)
+
+Assumes the smooth functions for the mean in each group can each be expressed:
+
+$$ f(t) = b_1(t)\beta_1 + b_2(t)\beta_2 $$
+where 
+
+- `\(b\)`s are *known functions* (cubic polynomials) that depend only on "knot" locations (t=0, median observation time, and last observation time). 
+
+- `\(\beta\)`s are unknown fixed effect regression coefficients estimated as usual by `gls` or `PROC MIXED`
+
+- resulting `\(f\)` has second derivative of 0 at t=0 and last observation time.
+
+Fit in `R`, using `nlme::gls`:
+
+
+```r
+gls(ADAS11 ~  female + age_c +   # bl covs
+    ns(months, df=2) +        # natural spline for placebo (1 knot)
+    ns(months, df=2):active + # natural spline for active (1 knot)
+  correlation = corSymm(form = ~ visNo | id), # general correlation
+  weights = varIdent(form = ~ 1 | visNo))     # heterogeneous variance
+```
+
+???
+
+And once we have the basis expansion, this is also just a linear model which can 
+be fit with gls.
+
+One downside is that we have to pre-specify the number and location of spline knots.
+
+Inference could be based on a likelihood ratio for the main group effect, or we could
+derive contrasts at any given timepoint.
+
+We are also exploring using time-varying test-version effects, which seems to be an
+efficient way to model the zig-zag mean trajectory we often see due to varying test
+difficulty.
+
+---
+
+## Modeled group contrasts for categorical, quadratic, and natrual cubic spline models
+
+&lt;img src="long_fig/unnamed-chunk-30-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+## Modeled group contrasts for quadratic and categorical time models
+
+
+```
+
+	 Simultaneous Tests for General Linear Hypotheses
+
+Fit: gls(model = ADAS11 ~ -1 + female + age_c + m0 + (m6 + m12 + m18) + 
+    (m6 + m12 + m18):active, data = trial_obs, correlation = corSymm(form = ~visNo | 
+    id), weights = varIdent(form = ~1 | m))
+
+Linear Hypotheses:
+         Estimate Std. Error z value Pr(&gt;|z|)   
+m6 == 0    -1.048      0.574   -1.83   0.1767   
+m12 == 0   -1.819      0.741   -2.46   0.0396 * 
+m18 == 0   -2.855      0.924   -3.09   0.0059 **
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+(Adjusted p values reported -- single-step method)
+```
+
+---
+
+# Taxonomy of common longitudinal models
+
+|                        | **MMRM**             | **LDA**              | **cLDA**             |
+|------------------------|----------------------|----------------------|----------------------|
+|**Mean structure**      | cat. time            | cat. or cts. time    | cat. or cts. time    |
+|**Variance-covariance** | correlated residuals | correlated residuals | correlated residuals |
+|                        |                      | or random effects    |  or random effects   |
+|**Baseline assessment** | as covariate         | as outcome;          | as outcome;          |
+|                        |                      | different means      |  common mean         | 
+|                        |                      | per group            |  per group           |
+|**Appropriate use**     | Randomized groups    | Non-randomized groups| Randomized groups    |
+
+Abbreviations: 
+
+* MMRM: Mixed Model of Repeated Measures
+* LDA: Longitudinal Data Analysis
+* cLDA: Constrained LDA
+* cat.: categorical
+* cts.: continuous
+
+---
+
+# MMRM vs cLDA
+
+* Both (can use) categorical time
+* **MMRM** has _change from baseline_ as outcome, baseline assessment as covariate
+  * need follow-up data to calculate change
+  * modified Intention-to-Treat (mITT) population (i.e. randomized and at least one follow-up assessment)
+* **cLDA** uses raw assessment scores as outcome; baseline assessment as outcome, constrains two groups to have same mean
+  * only need one observation to enter into analysis
+  * _unmodified_ Intention-to-Treat population (i.e. randomized with at least one assessment)
+  * baseline mean constraint really only appropriate in randomized studies
+* In our simulated trial it is a difference of `\(n=46\)` subjects
+
+Abbreviations: MMRM, Mixed Model of Repeated Measures; LDA, Longitudinal Data Analysis; cLDA, Constrained LDA.
+
+---
+
+# MMRM vs cLDA
+
+From Lu (2010):
+
+* (categorical time) cLDA more powerful than MMRM (aka "longitudinal ANCOVA") when baseline assessments are missing
+* cLDA advantage is greater when correlation between baseline and follow-up is weaker
+
+Caveat: Implicitly assumes data Missing at Random.
+
+In simulations of Preclinical Alzheimer's clinical trials, we have found power can increase from 80% with MMRM to about 90% with continuous-time cLDA.
+
+---
+
+# Natural Cubic Splines with **test version effect** in ADNI and HABS
+
+&lt;img src="./images/modeled-means-1.png" width="100%"  style="display: block; margin: auto;" /&gt;
+
+???
+
+Here are models fit to ADNI (top) and HABS (bottom)
+
+The left panel is MMRM with categorical time
+
+The middle and right panels are from the same natural cubic spline model, but one shows the estimated test version effect and the other hides it.
+
+The test version letters are shown along the bottom of each panel.
+
+HABS had more consistent versioning than ADNI.
+
+You can see that the first time version A re-appears at year 3, both amyloid positive and negative groups bump upward with higher scores.
+
+The spline model with version effect captures this quite nicely and in both cases we get a smooth representation of the trend over time removing the nuisance version effects.
+
+---
+
+class: inverse, middle, center
+
+# Nested random effects
+
+---
+
+# Subjects are (typically) nested within sites
+
+&lt;img src="long_fig/unnamed-chunk-33-1.svg" width="100%"  style="display: block; margin: auto;" /&gt;
+
+---
+
+# Testing for nested random effects
+
+
+```r
+hipp_fit &lt;- lme(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + ICV.bl,
+  hippvol, random = ~yrs|RID)
+
+hipp_fit_site &lt;- lme(Hippocampus ~ yrs*DX.bl + AGE + PTGENDER + ICV.bl,
+  hippvol, random = list(SITE = ~ yrs, RID = ~ yrs))
+
+anova(hipp_fit_site, hipp_fit)
+              Model df    AIC    BIC logLik   Test L.Ratio p-value
+hipp_fit_site     1 20 101915 102052 -50938                       
+hipp_fit          2 17 101927 102044 -50946 1 vs 2    17.9   5e-04
+```
+
+---
+
+# Nested random effects
+
+
+```
+Linear mixed-effects model fit by REML
+  Data: hippvol 
+     AIC    BIC logLik
+  101915 102052 -50938
+
+Random effects:
+ Formula: ~yrs | SITE
+ Structure: General positive-definite, Log-Cholesky parametrization
+            StdDev  Corr  
+(Intercept) 141.134 (Intr)
+yrs          19.341 -0.211
+
+ Formula: ~yrs | RID %in% SITE
+ Structure: General positive-definite, Log-Cholesky parametrization
+            StdDev  Corr  
+(Intercept) 847.535 (Intr)
+yrs          92.073 0.241 
+Residual    174.557       
+
+Fixed effects:  Hippocampus ~ yrs * DX.bl + AGE + PTGENDER + ICV.bl 
+                Value Std.Error   DF  t-value p-value
+(Intercept)    9238.8    327.68 5378  28.1946  0.0000
+yrs             -99.5      6.54 5378 -15.2136  0.0000
+DX.blSMC        161.6     95.75 1617   1.6873  0.0917
+DX.blEMCI      -256.2     66.36 1617  -3.8606  0.0001
+DX.blLMCI     -1041.5     57.04 1617 -18.2588  0.0000
+DX.blAD       -1611.0     64.94 1617 -24.8075  0.0000
+AGE             -59.6      3.03 1617 -19.7146  0.0000
+PTGENDERMale    191.4     52.44 1617   3.6499  0.0003
+ICV.bl            0.0      0.00 1617  10.3987  0.0000
+yrs:DX.blSMC     -1.9     17.57 5378  -0.1068  0.9150
+yrs:DX.blEMCI   -18.5      9.63 5378  -1.9194  0.0550
+yrs:DX.blLMCI   -78.8      8.40 5378  -9.3781  0.0000
+yrs:DX.blAD    -126.7     13.93 5378  -9.0982  0.0000
+ Correlation: 
+              (Intr) yrs    DX.SMC DX.EMC DX.LMC DX.bAD AGE    PTGEND ICV.bl
+yrs            0.012                                                        
+DX.blSMC      -0.122 -0.050                                                 
+DX.blEMCI     -0.222 -0.072  0.297                                          
+DX.blLMCI     -0.086 -0.084  0.336  0.489                                   
+DX.blAD       -0.075 -0.074  0.292  0.417  0.495                            
+AGE           -0.716  0.000  0.079  0.159  0.057  0.002                     
+PTGENDERMale   0.426  0.003  0.023 -0.069 -0.035 -0.018 -0.125              
+ICV.bl        -0.716 -0.003  0.010  0.048 -0.064 -0.012  0.051 -0.577       
+yrs:DX.blSMC  -0.006 -0.316  0.047  0.027  0.031  0.027  0.000 -0.003  0.001
+yrs:DX.blEMCI -0.010 -0.572  0.033  0.109  0.057  0.050 -0.003 -0.001  0.003
+yrs:DX.blLMCI -0.006 -0.653  0.037  0.055  0.103  0.057 -0.010 -0.003  0.002
+yrs:DX.blAD   -0.008 -0.394  0.023  0.034  0.040  0.030  0.000 -0.001  0.001
+              y:DX.S y:DX.E y:DX.L
+yrs                               
+DX.blSMC                          
+DX.blEMCI                         
+DX.blLMCI                         
+DX.blAD                           
+AGE                               
+PTGENDERMale                      
+ICV.bl                            
+yrs:DX.blSMC                      
+yrs:DX.blEMCI  0.218              
+yrs:DX.blLMCI  0.250  0.445       
+yrs:DX.blAD    0.148  0.265  0.308
+
+Standardized Within-Group Residuals:
+       Min         Q1        Med         Q3        Max 
+-7.9323040 -0.4498404  0.0010723  0.4585885  6.6149226 
+
+Number of Observations: 7069
+Number of Groups: 
+         SITE RID %in% SITE 
+           62          1686 
+```
+
+---
+
+# Summary
+
+.large[
+
+Longitudinal Data Analysis methods:
+
+- Mean structures
+- Variance-covariance structures
+- Mixed Model for Repeated Measures (MMRM)
+- Constrained Longitudinal Analysis (cLDA)
+- Nested random effects
+
+]
+
+---
+
+# References (1/2)
+
+Buuren, S. v. and K. Groothuis-Oudshoorn (2010). "mice: Multivariate
+imputation by chained equations in R". In: _Journal of statistical
+software_, pp. 1-68.
+
+Diggle, P., P. J. Diggle, P. Heagerty, K. Liang, P. J. Heagerty, S.
+Zeger, and others (2002). _Analysis of longitudinal data_. Oxford
+University Press.
+
+Donohue, M. and P. Aisen (2012). "Mixed model of repeated measures
+versus slope models in Alzheimer’s disease clinical trials". In: _The
+journal of nutrition, health &amp; aging_ 16.4, pp. 360-364.
+
+Fitzmaurice, G. M., N. M. Laird, and J. H. Ware (2012). _Applied
+longitudinal analysis_. Vol. 998. John Wiley &amp; Sons.
+
+Little, R. J. and D. B. Rubin (2019). _Statistical analysis with
+missing data_. Vol. 793. John Wiley &amp; Sons.
+
+Lu, K. (2010). "On efficiency of constrained longitudinal data analysis
+versus longitudinal analysis of covariance". In: _Biometrics_ 66.3, pp.
+891-896.
+
+Mallinckrodt, C. H., T. M. Sanger, S. Dubé, D. J. DeBrota, G.
+Molenberghs, R. J. Carroll, W. Z. Potter, and G. D. Tollefson (2003).
+"Assessing and interpreting treatment effects in longitudinal clinical
+trials with missing data". In: _Biological psychiatry_ 53.8, pp.
+754-760.
+
+Molenberghs, G. and M. Kenward (2007). _Missing data in clinical
+studies_. Vol. 61. John Wiley &amp; Sons.
+
+---
+
+# References (2/2)
+
+Pinheiro, J. and D. Bates (2006). _Mixed-effects models in S and
+S-PLUS_. Springer Science &amp; Business Media.
+
+Verbeke, G. and G. Molenberghs (2000). _Linear Mixed Models for
+Longitudinal Data_. Springer-Verlag New York.
+
+---
+
+class: inverse, middle, center
+
+# Appendix
+
+---
+
+class: inverse, middle, center
+
+# Missingness
+
+---
+
+# Missing Data: Notation
+
+* Measurement: `\(Y_{ij}\)` (e.g. `\(\textrm{ADAS}_{ij}\)`)
+* Covariates: `\(X_{i}\)` (e.g. treatment, gender, age, \ldots)
+* Missingness indicator:
+    
+`$$R_{ij} = \left\{
+     \begin{array}{l}
+       1 \textrm{ if }Y_{ij}\textrm{ is observed}\\
+       0 \textrm{ otherwise}
+      \end{array} \right.$$`
+      
+* Let `\(\mathbf{Y}_i = (Y_{i1},\ldots,Y_{in_i})' = (\mathbf{Y}_i^o, \mathbf{Y}_i^m)\)`, where
+
+`$$\mathbf{Y}_i^o \textrm{ observed }Y_{ij}$$`
+`$$\mathbf{Y}_i^m \textrm{ un-observed }Y_{ij}$$`
+
+* `\(D_i\)` is time of dropout
+* `\(\theta\)` parameters that control `\(\mathbf{Y}_i\)` (e.g. effects for treatment, gender, age, `\(\ldots\)`)
+* `\(\psi\)` parameters that control `\(\mathbf{R}_i\)` (e.g. treatment effect, `\(\mathbf{Y}_i^m\)`, `\(\ldots\)`)
+
+The notation is supposed to be a helpful shorthand. If it's not helpful, don't worry about it!
+
+---
+
+# Taxonomy of missing data mechanism
+
+Missing data mechanisms are defined in terms of the assumed distribution function, `\(F\)`, or "data generating mechanism," for the missingness indicator `\(R_i\)`
+
+
+| Term | Notation | Missingness depends on: |
+|------|----------|-------------------------|
+| Missing **Completely** at Random | `\(\mathbf{R}_i \sim F(X_i, \psi)\)` | covariates |
+| Missing at Random | `\(\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)\)` | covariates &amp; observed assessments|
+| Missing **Not** at Random | `\(\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)\)` | covariates, observed assessments, **unobserved** assessments |
+
+We'll unpack these a bit `\(\ldots\)`
+
+---
+
+# Missing _Completely_ at Random (MCAR)
+
+.large[
+
+`\(\mathbf{R}_i \sim F(X_i, \psi)\)`: Missingness (may) depend only on observed covariates ( `\(X_i\)`)
+
+Appropriate methods:
+
+* Complete Case (e.g. ANCOVA) (?)
+* Last Observation Carried Forward (LOCF) (?)
+* Single imputation (?)
+
+]
+
+---
+
+# Missing at Random (MAR)
+
+.large[
+
+`\(\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \psi)\)`: Missingness (may) depend on observed covariates ( `\(X_i\)`) and/or observed outcomes ( `\(\mathbf{Y}_i^o\)`)
+
+Appropriate methods:
+
+* **Direct likelihood (e.g. mixed-effects models, MMRM, cLDA)!**,
+* Multiple imputation
+* Weighted generalized estimating equations (WGEE)
+
+]
+
+---
+
+# Missing _Not_ at Random (MNAR)
+
+.large[
+
+`\(\mathbf{R}_i \sim F(X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)\)`: Missingness (may) depend on observed covariates ( `\(X_i\)`), observed outcomes ( `\(\mathbf{Y}_i^o\)`), and unobserved outcomes ( `\(\mathbf{Y}_i^m\)`)
+
+Appropriate sensitivity analyses (?):
+
+* selection models: `\(f(\mathbf{Y}_i|X_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{Y}_i^o, \mathbf{Y}_i^m, \psi)\)`
+* pattern-mixture models (e.g. "tipping point" stress test): `\(f(\mathbf{Y}_i|X_i, \mathbf{R}_i, \theta)f(\mathbf{R}_i|X_i, \psi)\)`
+* shared-parameter models: `\(f(\mathbf{Y}_i|X_i, \mathbf{b}_i, \theta)f(\mathbf{R}_i|X_i, \mathbf{b}_i, \psi)\)`
+
+All of these approaches make untestable assumptions about missingness.
+
+We can never completely rule out MNAR, since, if it exists, it depends on variables that we do _not_ observe.
+
+]
+
+---
+
+# Missing data: bottom line
+
+* _Missing Not at Random_ is impossible to rule out. The best we can do is _sensitivity analyses_ or apply models that make strong untestable assumptions about missingness mechanism.
+* _Missing Completely At Random_ is an unrealistic and unnecessary assumption.
+* _Missing at Random_ is a more reasonable assumption, and we have reliable methods that are robust in this case.
+
+Direct likelihood (mixed-effects) is recommended. Complete case (ANCOVA), LOCF, and single imputation should be _avoided_.
+
+---
+
+class: inverse, middle, center
+
+# Multiple Imputation
+
+---
+
+# Multiple imputation (MI)
+
+.large[
+
+Basic steps:
+
+* Create multiple complete versions of the data with imputed plausible values
+* Analyze each complete version with standard methods (e.g. ANCOVA)
+* Combine the results
+
+Comments:
+
+* MI requires many more modeling decisions than direct likelihood methods (e.g. number of imputations, imputation methods, `\(\ldots\)`)
+* CAUTION: Lots of nuance and complexity
+* Usually reserved for _sensitivity analyses_
+
+]
+
+
+
+---
+
+# 1. Create multiple complete versions
+
+
+```r
+trial_imp &lt;- mice(trial_wide, predictorMatrix=predictorMatrix, seed = 20170714, maxit=100)
+```
+
+
+```r
+print(head(trial_wide), digits = 2) # raw data with missing values:
+  id female age age_c active   group ADAS11.m0 ADAS11.m6 ADAS11.m12 ADAS11.m18
+1  1      0  75  0.16      1  active        12        20         21         17
+2  2      1  74 -0.96      1  active        27        37         32         42
+3  3      0  71 -4.03      0 placebo        30        27         NA         NA
+4  4      0  79  4.45      0 placebo        17        23         NA         NA
+5  5      0  88 12.70      1  active        18        27         26         28
+6  6      1  66 -8.55      0 placebo        18        19         20         14
+print(head(complete(trial_imp)), digits = 2) # first complete version:
+  id female age age_c active   group ADAS11.m0 ADAS11.m6 ADAS11.m12 ADAS11.m18
+1  1      0  75  0.16      1  active        12        20         21         17
+2  2      1  74 -0.96      1  active        27        37         32         42
+3  3      0  71 -4.03      0 placebo        30        27         27         36
+4  4      0  79  4.45      0 placebo        17        23         26         37
+5  5      0  88 12.70      1  active        18        27         26         28
+6  6      1  66 -8.55      0 placebo        18        19         20         14
+```
+
+---
+
+# 2. Analyze each complete version
+
+
+```
+# A tibble: 20 x 6
+   term                     estimate std.error statistic   p.value  nobs
+   &lt;chr&gt;                       &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt; &lt;int&gt;
+ 1 (Intercept)                28.7      0.551     52.0   4.05e-179   400
+ 2 active                     -2.56     0.780     -3.28  1.14e-  3   400
+ 3 center(ADAS11.m0)           1.26     0.0810    15.6   4.14e- 43   400
+ 4 active:center(ADAS11.m0)    0.182    0.117      1.56  1.21e-  1   400
+ 5 (Intercept)                28.2      0.545     51.8   2.12e-178   400
+ 6 active                     -2.37     0.771     -3.07  2.30e-  3   400
+ 7 center(ADAS11.m0)           1.30     0.0801    16.3   6.87e- 46   400
+ 8 active:center(ADAS11.m0)    0.180    0.116      1.55  1.22e-  1   400
+ 9 (Intercept)                28.8      0.549     52.4   3.07e-180   400
+10 active                     -3.38     0.776     -4.35  1.71e-  5   400
+11 center(ADAS11.m0)           1.22     0.0807    15.2   2.93e- 41   400
+12 active:center(ADAS11.m0)    0.247    0.117      2.12  3.48e-  2   400
+13 (Intercept)                28.2      0.555     50.9   9.49e-176   400
+14 active                     -2.82     0.785     -3.59  3.74e-  4   400
+15 center(ADAS11.m0)           1.30     0.0815    16.0   1.26e- 44   400
+16 active:center(ADAS11.m0)    0.105    0.118      0.887 3.76e-  1   400
+17 (Intercept)                28.3      0.554     51.1   1.71e-176   400
+18 active                     -2.77     0.783     -3.54  4.49e-  4   400
+19 center(ADAS11.m0)           1.31     0.0814    16.0   5.28e- 45   400
+20 active:center(ADAS11.m0)    0.106    0.118      0.898 3.70e-  1   400
+```
+
+---
+
+# 3. Combine the results
+
+
+```
+                         estimate std.error statistic      df p.value
+(Intercept)               28.4425    0.6242   45.5642 64.4300    0.00
+active                    -2.7775    0.8842   -3.1413 63.2660    0.00
+center(ADAS11.m0)          1.2790    0.0899   14.2324 82.9004    0.00
+active:center(ADAS11.m0)   0.1638    0.1342    1.2204 56.3567    0.23
+```
+
+---
+
+# "Tipping point" MNAR stress test
+
+
+
+Treatment effects for different MNAR factors:
+
+
+```
+     tipping_factor estimate std.error statistic      df p.value
+[1,]         0.5000  -2.1280    0.8868   -2.3997 63.8749   0.019
+[2,]         0.7500  -1.8032    0.8899   -2.0262 64.6224   0.047
+[3,]         1.0000  -1.4785    0.8943   -1.6532 65.6676   0.103
+[4,]         1.2500  -1.1537    0.8999   -1.2820 67.0127   0.204
+[5,]         1.5000  -0.8289    0.9067   -0.9143 68.6605   0.364
+[6,]         1.7500  -0.5042    0.9146   -0.5513 70.6140   0.583
+[7,]         2.0000  -0.1794    0.9236   -0.1942 72.8761   0.847
+```
+
+---
+
+# "Tipping point" MNAR stress test
+
+
+
+Imputed ADAS.m18 under MAR 
+
+
+```
+  id female    age   group ADAS11.m0 ADAS11.m6 ADAS11.m12 ADAS11.m18
+1  3      0 70.964 placebo        30        27         27         36
+2  4      0 79.440 placebo        17        23         26         37
+3 11      1 87.268  active        17        28         27         24
+4 12      0 80.853 placebo        28        29         23         29
+5 14      0 77.553 placebo        28        32         38         46
+```
+
+Imputed ADAS.m18 under MNAR ( `\(k\)`=1.25,  `\(k\times 4=\)` 5 ADAS points)
+
+
+```
+  id female    age   group ADAS11.m0 ADAS11.m6 ADAS11.m12 ADAS11.m18
+1  3      0 70.964 placebo        30        27         27         36
+2  4      0 79.440 placebo        17        23         26         37
+3 11      1 87.268  active        17        28         27         29
+4 12      0 80.853 placebo        28        29         23         29
+5 14      0 77.553 placebo        28        32         38         46
+```
+
+Imputed ADAS11.m18 values are only changed for those in active group
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "solarized-light",
+"highlightLanguage": ["r", "css", "yaml"],
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
