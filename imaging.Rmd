@@ -2,7 +2,7 @@
 title: Biostatistics for Imaging Biomarkers and Introduction to Longitudinal Data
 output: 
   xaringan::moon_reader:
-    self_contained:  false
+    self_contained:  TRUE
     css: ["default", "default-fonts", "./css/styles.css"]
     seal: false 
     lib_dir: libs

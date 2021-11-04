@@ -2,7 +2,7 @@
 title: Biostatistics for Fluid Biomarkers
 output: 
   xaringan::moon_reader:
-    self_contained:  false
+    self_contained:  true
     css: ["default", "default-fonts", "./css/styles.css"]
     seal: false 
     lib_dir: libs

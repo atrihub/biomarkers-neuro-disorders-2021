@@ -10,6 +10,8 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
 
 ### Biostatistics for Fluid Biomarkers (16:00-16:50)
 
+[Slides](https://rawcdn.githack.com/atrihub/biomarkers-neuro-disorders-2021/master/fluid.html)
+
 - Batch Effects
 - Experimental Design (Sample Randomization)
 - Statistical Models for Assay Calibration/Quantification
@@ -23,6 +25,8 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
 
 ### Biostatistics for Imaging Biomarkers (17:00-17:50)
 
+[Slides](https://rawcdn.githack.com/atrihub/biomarkers-neuro-disorders-2021/master/imaging.html)
+
 - Reference Regions
 - Centiloids
 - Standardization using the Empirical Cumulative Distribution Function (ECDF)
@@ -33,6 +37,8 @@ The biostatistics module is from *16:00 to 19:00 (Gothenburg) Wednesday May 26, 
   - Two-stage models
 
 ### Longitudinal Data (18:00-18:50)
+
+[Slides](https://rawcdn.githack.com/atrihub/biomarkers-neuro-disorders-2021/master/longitudinal.html)
 
 - Mixed effect models
 - Mean & Variance Structure
